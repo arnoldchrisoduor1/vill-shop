@@ -1,0 +1,60 @@
+# docker-compose.prod.yml
+services:
+  postgres:
+    ports: []           # remove public binding — internal only
+    expose:
+      - "5432"
+
+  redis:
+    ports: []
+    expose:
+      - "6379"
+
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"   # localhost only
+      - "127.0.0.1:9001:9001"
+
+  mailpit:
+    ports: []           # not needed in production
+
+  nest-api:
+    build:
+      target: production        # override to production stage
+    command: npm run start:prod
+    environment:
+      NODE_ENV: production
+      PORT: 8081
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: villshop
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: villshop
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: villshop
+      PESAPAL_ENV: live
+      FRONTEND_URL: https://shop.villa-allegra.com
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes: []         # no source mounts in production
+    ports:
+      - "127.0.0.1:8081:8081"   # localhost only — nginx proxies
+
+  frontend:
+    build:
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: https://shop.villa-allegra.com/api
+    ports:
+      - "127.0.0.1:3001:3000"   # map to 3001 on host, avoid clash with villa-allegra
