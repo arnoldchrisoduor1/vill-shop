@@ -47,7 +47,7 @@ export function ProductsToolbar({
       if (trimmed === (currentQuery ?? '')) return;
       updateParams({ q: trimmed || null });
     }, 350);
-    return () => clearTimeout();
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 

@@ -4,7 +4,6 @@ import { Suspense } from 'react';
 import { ProductCard } from './ProductCard';
 import { ProductListItem } from './ProductListItem';
 import { ProductsToolbar } from './ProductsToolbar';
-import { ProductCardSkeleton } from '../ui/Skeleton';
 import type { Category, Product } from '../../types';
 
 interface ProductsCatalogProps {

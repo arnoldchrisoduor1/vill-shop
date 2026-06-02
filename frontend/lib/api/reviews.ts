@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete, apiFetch } from './apiFetch';
+import { apiGet, apiDelete, apiFetch } from './apiFetch';
 import type { Review } from '../../types';
 import type { PaginatedResponse } from '../../types/api';
 
