@@ -1,20 +1,24 @@
 services:
   postgres:
     ports:
-      - "127.0.0.1:5432:5432"    # restrict to localhost only
+      - "127.0.0.1:15432:5432"
 
   redis:
     ports:
-      - "127.0.0.1:6379:6379"    # restrict to localhost only
+      - "127.0.0.1:16379:6379"
 
   minio:
     ports:
-      - "127.0.0.1:9000:9000"    # replace 0.0.0.0:9000
-      - "127.0.0.1:9001:9001"    # replace 0.0.0.0:9001
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:19001:9001"
 
   mailpit:
     profiles:
       - dev
+
+  minio-setup:
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
 
   nest-api:
     build:
@@ -49,7 +53,12 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
-      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:18081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -58,5 +67,9 @@ services:
       target: production
       args:
         NEXT_PUBLIC_API_URL: https://shop.villa-allegra.com/api
+    environment:
+      NODE_ENV: production
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:13001:3000"
+    depends_on:
+      - nest-api
