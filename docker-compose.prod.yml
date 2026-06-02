@@ -13,9 +13,8 @@ services:
       - "127.0.0.1:9001:9001"    # replace 0.0.0.0:9001
 
   mailpit:
-    ports:
-      - "127.0.0.1:1025:1025"
-      - "127.0.0.1:8025:8025"
+    profiles:
+      - dev
 
   nest-api:
     build:
