@@ -1,151 +1,112 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui';
-import type { HeroSlide } from '@/types';
+import { Button } from '../ui/Button';
+import type { HeroSlide } from '../../types';
 
-interface HeroCarouselProps {
-  slides: HeroSlide[];
-}
-
-export function HeroCarousel({ slides }: HeroCarouselProps) {
+export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0);
-  const activeSlides = slides.filter((s) => s.is_active);
-
-  const next = useCallback(() => {
-    setCurrent((c) => (c + 1) % activeSlides.length);
-  }, [activeSlides.length]);
-
-  const prev = useCallback(() => {
-    setCurrent((c) => (c - 1 + activeSlides.length) % activeSlides.length);
-  }, [activeSlides.length]);
 
   useEffect(() => {
-    if (activeSlides.length <= 1) return;
-    const timer = setInterval(next, 6000);
+    if (slides.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % slides.length);
+    }, 5000);
     return () => clearInterval(timer);
-  }, [activeSlides.length, next]);
+  }, [slides.length]);
 
-  if (activeSlides.length === 0) {
+  if (slides.length === 0) {
     return (
-      <section className="relative h-[500px] bg-gradient-to-br from-primary to-secondary">
-        <div className="container-page flex h-full flex-col justify-center">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl text-4xl font-bold text-white md:text-5xl"
-          >
-            Welcome to Vill Shop
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mt-4 max-w-xl text-lg text-white/90"
-          >
-            Discover premium products with exceptional quality and fast delivery.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-8"
-          >
-            <Link href="/products">
-              <Button size="lg" variant="secondary">
-                Shop Now
-              </Button>
-            </Link>
-          </motion.div>
+      <div className="h-[500px] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center">
+        <div className="text-center text-white px-4">
+          <h1 className="text-4xl md:text-6xl font-bold mb-4">Welcome to Vill Shop</h1>
+          <p className="text-xl mb-8 opacity-80">Quality products at great prices</p>
+          <Link href="/products"><Button size="lg" variant="secondary">Shop Now</Button></Link>
         </div>
-      </section>
+      </div>
     );
   }
 
-  const slide = activeSlides[current];
+  const slide = slides[current];
 
   return (
-    <section className="relative h-[500px] overflow-hidden">
+    <div className="relative h-[500px] overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
-          key={slide.id}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          key={current}
+          initial={{ opacity: 0, x: 60 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -60 }}
+          transition={{ duration: 0.5 }}
           className="absolute inset-0"
         >
-          <Image
-            src={slide.image_url}
-            alt={slide.title}
-            fill
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-foreground/70 to-transparent" />
+          {slide.imageUrl ? (
+            <Image src={slide.imageUrl} alt={slide.headline} fill className="object-cover" priority />
+          ) : (
+            <div className="h-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]" />
+          )}
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-white px-4 max-w-3xl">
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="text-4xl md:text-6xl font-bold mb-4"
+              >
+                {slide.headline}
+              </motion.h1>
+              {slide.subtext && (
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-xl mb-8 opacity-90"
+                >
+                  {slide.subtext}
+                </motion.p>
+              )}
+              {slide.ctaLabel && slide.ctaUrl && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                  <Link href={slide.ctaUrl}>
+                    <Button size="lg" variant="secondary">{slide.ctaLabel}</Button>
+                  </Link>
+                </motion.div>
+              )}
+            </div>
+          </div>
         </motion.div>
       </AnimatePresence>
 
-      <div className="container-page relative flex h-full flex-col justify-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={slide.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-          >
-            <h1 className="max-w-2xl text-4xl font-bold text-white md:text-5xl">
-              {slide.title}
-            </h1>
-            {slide.subtitle && (
-              <p className="mt-4 max-w-xl text-lg text-white/90">{slide.subtitle}</p>
-            )}
-            {slide.cta_text && slide.cta_url && (
-              <div className="mt-8">
-                <Link href={slide.cta_url}>
-                  <Button size="lg" variant="secondary">
-                    {slide.cta_text}
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {activeSlides.length > 1 && (
+      {slides.length > 1 && (
         <>
           <button
-            type="button"
-            onClick={prev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30"
+            onClick={() => setCurrent((prev) => (prev - 1 + slides.length) % slides.length)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 transition-colors"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
           <button
-            type="button"
-            onClick={next}
-            className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30"
+            onClick={() => setCurrent((prev) => (prev + 1) % slides.length)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 transition-colors"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
-          <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
-            {activeSlides.map((_, i) => (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            {slides.map((_, i) => (
               <button
                 key={i}
-                type="button"
                 onClick={() => setCurrent(i)}
-                className={`h-2 rounded-full ${
-                  i === current ? 'w-8 bg-white' : 'w-2 bg-white/50'
-                }`}
+                className={`h-2 rounded-full transition-all ${i === current ? 'w-6 bg-white' : 'w-2 bg-white/50'}`}
               />
             ))}
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }

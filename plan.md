@@ -1,29 +1,31 @@
-1. for searhc lets just use laravel to do the searches instead of using thirsd party tools that add unecessary complexity.
+# Vill Shop — Decisions Log
 
-2. We will plan for webhook handler.
+1. For search, use native PostgreSQL pg_trgm instead of third-party tools.
 
-3. we will use laravel-model-states.
+2. Webhook handler implemented for Pesapal payment notifications.
 
-4. yes add implementation for stock lock.
+3. Order state machine implemented with explicit transitions via OrderStateService.
 
-5. JWT for auth process.
+4. Stock locking implemented using TypeORM QueryRunner with `pessimistic_write` lock to prevent overselling.
 
-6. throttling per routes.
+5. JWT for auth — issued as httpOnly cookie for security.
 
-7. yes add testing with the mentioned tools.
+6. Throttling per route group via @nestjs/throttler.
 
-8. for tax, we will appendit to features flags, such that the admin can aither decide to apply tax or not bith in the fronten and in the backend.
+7. Testing: Jest + Supertest for backend (unit + integration), Playwright for frontend e2e.
 
-for emails i always use the free smtp service give me your recomendations
+8. Tax feature controlled via feature flags. Admin can toggle tax on/off from the admin panel. Tax amount stored separately on orders and never recomputed after creation.
 
-we wil use nodemailer for emails, 
+9. Email: Nodemailer with free SMTP (local: Mailpit, production: Brevo 300/day free tier or Gmail SMTP app password). No paid service required.
 
-for the UI use turquois blue as the primary color and green as secondary color, 
-make colors and fonts as css variables for easier fututure changes,
+10. UI primary color: turquoise blue (#00b5b8), secondary: green (#22c55e). All colors and fonts as CSS variables in globals.css.
 
-components such as cards, buttons,  toggles, dropdowns, input , textarea etc should all be from a single point of truth with a single design, 
+11. All UI components (Button, Card, Input, Toggle, etc.) from a single design system at components/ui/. No one-off inline variants.
 
-use framer motion  for animations.
+12. Framer Motion for all animations and transitions.
 
-lucide icons for icons avaoid svgs.
+13. Lucide icons only — no raw SVGs.
 
+14. Multi-currency: prices stored in KES (base), converted at display time using exchange rates fetched daily from exchangerate.host (free, no CC required).
+
+15. Backend: NestJS 10, TypeScript strict, TypeORM, PostgreSQL, BullMQ (replaces Laravel/PHP).

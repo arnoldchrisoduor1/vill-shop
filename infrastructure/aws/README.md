@@ -2,7 +2,7 @@
 
 ## Architecture
 
-- **ECS Fargate** — 3 services: `vill-shop-api`, `vill-shop-horizon`, `vill-shop-frontend`
+- **ECS Fargate** — 2 services: `vill-shop-api` (NestJS + BullMQ workers), `vill-shop-frontend`
 - **RDS PostgreSQL 16** — Multi-AZ, `db.t3.medium`
 - **ElastiCache Redis 7** — cluster mode
 - **S3** — media + digital product files
@@ -15,8 +15,7 @@
 
 | Service | Image | Port | Notes |
 |---|---|---|---|
-| vill-shop-api | vill-shop-backend | 80 (nginx) | 2+ tasks, auto-scaling |
-| vill-shop-horizon | vill-shop-backend | — | `php artisan horizon` |
+| vill-shop-api | vill-shop-backend | 8081 | 2+ tasks, BullMQ workers included |
 | vill-shop-frontend | vill-shop-frontend | 3000 | 2+ tasks |
 
 ## Required Secrets (Secrets Manager)
@@ -25,12 +24,16 @@
 vill-shop/production:
   JWT_SECRET
   DB_PASSWORD
-  RESEND_KEY
+  SMTP_HOST
+  SMTP_PORT
+  SMTP_USER
+  SMTP_PASS
   PESAPAL_CONSUMER_KEY
   PESAPAL_CONSUMER_SECRET
-  SENTRY_LARAVEL_DSN
+  SENTRY_DSN
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
+  EXCHANGE_RATE_API_KEY
 ```
 
 ## CloudWatch Alarms
@@ -39,7 +42,7 @@ vill-shop/production:
 |---|---|---|
 | API CPU High | ECS CPUUtilization | > 80% for 5 min |
 | API Error Rate | ALB HTTPCode_Target_5XX | > 10 in 5 min |
-| Queue Depth | Horizon queue size | > 100 for 10 min |
+| Queue Depth | BullMQ waiting jobs | > 100 for 10 min |
 | RDS Storage | FreeStorageSpace | < 5 GB |
 
 ## Deployment
@@ -47,13 +50,11 @@ vill-shop/production:
 Images pushed via GitHub Actions on merge to `main`.
 ECS services use `--force-new-deployment` to pull latest images.
 
-## Scheduler (ECS Scheduled Task)
+## Scheduled Tasks
 
-Run every minute:
-```
-php artisan schedule:run
-```
+`@nestjs/schedule` runs inside the `vill-shop-api` ECS service. No separate scheduler task needed.
 
 Tasks:
-- Daily: exchange rate fetch, stale cart cleanup
+- Daily: exchange rate fetch
+- Daily: stale cart cleanup
 - Hourly: low stock sweep

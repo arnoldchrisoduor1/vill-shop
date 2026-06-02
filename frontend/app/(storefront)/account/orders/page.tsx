@@ -2,81 +2,69 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { ordersApi } from '../../../../lib/api/orders';
+import { Skeleton } from '../../../../components/ui/Skeleton';
+import { formatDate, formatPrice, getOrderStateColor } from '../../../../lib/utils';
+import type { Order } from '../../../../types';
 import { Package } from 'lucide-react';
-import { Badge, Card, CardContent } from '@/components/ui';
-import { getOrders } from '@/lib/api/orders';
-import { formatCurrency } from '@/lib/utils';
-import type { Order } from '@/types';
+import { toast } from 'sonner';
 
-export default function AccountOrdersPage() {
+export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getOrders()
-      .then(setOrders)
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
+    ordersApi.getOrders()
+      .then((data) => setOrders(data.items ?? []))
+      .catch(() => {
+        setOrders([]);
+        toast.error('Failed to load orders');
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
-  if (loading) {
-    return <p className="text-muted">Loading orders...</p>;
-  }
-
-  if (orders.length === 0) {
+  if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Package className="mx-auto mb-4 h-12 w-12 text-muted" />
-          <h2 className="text-lg font-semibold">No orders yet</h2>
-          <p className="mt-2 text-muted">Start shopping to see your orders here</p>
-          <Link href="/products" className="mt-4 inline-block text-primary hover:underline">
-            Browse Products
-          </Link>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        {[1,2,3].map((i) => <Skeleton key={i} variant="card" className="h-24" />)}
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {orders.map((order, i) => (
-        <motion.div
-          key={order.id}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.05 }}
-        >
-          <Card>
-            <CardContent>
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <Link href={`/account/orders/${order.order_number}`} className="font-mono font-semibold hover:text-primary">
-                    {order.order_number}
-                  </Link>
-                  <p className="text-sm text-muted">
-                    {new Date(order.created_at).toLocaleDateString('en-KE', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
+    <div>
+      <h2 className="text-lg font-semibold mb-6">My Orders</h2>
+      {orders.length === 0 ? (
+        <div className="text-center py-12">
+          <Package className="h-16 w-16 text-[var(--color-border)] mx-auto mb-4" />
+          <p className="text-[var(--color-text-muted)]">No orders yet.</p>
+          <Link href="/products" className="text-[var(--color-primary)] text-sm mt-2 block">Start Shopping</Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((order) => (
+            <Link key={order.id} href={`/account/orders/${order.id}`}>
+              <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-4 hover:border-[var(--color-primary)] transition-colors">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{order.orderNumber}</p>
+                    <p className="text-sm text-[var(--color-text-muted)]">{formatDate(order.createdAt)}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getOrderStateColor(order.state)}`}>
+                      {order.state}
+                    </span>
+                    <p className="font-semibold text-[var(--color-primary)] mt-1">
+                      {formatPrice(Number(order.total), order.currency)}
+                    </p>
+                  </div>
                 </div>
-                <Badge variant="primary">{order.status}</Badge>
-                <div className="text-right">
-                  <p className="font-bold text-primary">
-                    {formatCurrency(order.total, order.currency)}
-                  </p>
-                  <p className="text-sm text-muted">
-                    {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
+                <p className="text-sm text-[var(--color-text-muted)] mt-2">{order.items?.length ?? 0} item(s)</p>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

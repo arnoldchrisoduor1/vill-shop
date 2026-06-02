@@ -1,87 +1,109 @@
-import { env } from '@/config/env';
-import { CURRENCY_COOKIE, DEFAULT_CURRENCY } from '@/lib/constants';
-import { getSessionId } from '@/lib/session';
-import type { ApiError, ApiResponse } from '@/types';
+import { API_URL } from '../constants';
+import { getCookie } from '../cookies';
+import type { ApiResponse } from '../../types/api';
 
-export class ApiFetchError extends Error {
+class ApiError extends Error {
   constructor(
+    public readonly status: number,
     message: string,
-    public status: number,
-    public errors?: Record<string, string[]>,
+    public readonly errors?: Record<string, string[]>,
   ) {
     super(message);
-    this.name = 'ApiFetchError';
+    this.name = 'ApiError';
   }
-}
-
-function getCurrency(): string {
-  if (typeof document === 'undefined') return DEFAULT_CURRENCY;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${CURRENCY_COOKIE}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : DEFAULT_CURRENCY;
-}
-
-interface ApiFetchOptions extends Omit<RequestInit, 'body'> {
-  body?: unknown;
-  params?: Record<string, string | number | boolean | undefined>;
-}
-
-function buildUrl(path: string, params?: ApiFetchOptions['params']): string {
-  const url = new URL(`${env.apiUrl}${path.startsWith('/') ? path : `/${path}`}`);
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        url.searchParams.set(key, String(value));
-      }
-    });
-  }
-  return url.toString();
 }
 
 export async function apiFetch<T>(
   path: string,
-  options: ApiFetchOptions = {},
-): Promise<T> {
-  const { body, params, headers: customHeaders, ...rest } = options;
-  const isFormData = body instanceof FormData;
+  options: RequestInit = {},
+): Promise<ApiResponse<T>> {
+  const isFormData = options.body instanceof FormData;
 
-  const sessionId = typeof window !== 'undefined' ? getSessionId() : '';
+  const headers: Record<string, string> = {};
 
-  const headers: HeadersInit = {
-    Accept: 'application/json',
-    'X-Currency': getCurrency(),
-    ...(sessionId ? { 'X-Session-ID': sessionId } : {}),
-    ...(customHeaders as Record<string, string>),
-  };
-
-  if (body && !isFormData) {
-    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(buildUrl(path, params), {
-    ...rest,
+  // Append currency query param to GET requests
+  let url = `${API_URL}${path}`;
+  if (!options.method || options.method === 'GET') {
+    const currency = typeof window !== 'undefined' ? getCookie('currency') : null;
+    if (currency && currency !== 'KES') {
+      const separator = url.includes('?') ? '&' : '?';
+      url = `${url}${separator}currency=${currency}`;
+    }
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...headers, ...(options.headers as Record<string, string>) },
     credentials: 'include',
-    headers,
-    body: body
-      ? isFormData
-        ? (body as FormData)
-        : JSON.stringify(body)
-      : undefined,
+    // Next.js caches server-component fetch by default; storefront must read fresh API data
+    cache: options.cache ?? 'no-store',
   });
 
-  if (response.status === 204) {
-    return undefined as T;
+  if (response.status === 401) {
+    const isSessionCheck = url.includes('/auth/me');
+    const isAuthRequest = url.includes('/auth/login') || url.includes('/auth/register');
+    if (
+      typeof window !== 'undefined' &&
+      !isSessionCheck &&
+      !isAuthRequest &&
+      !window.location.pathname.startsWith('/login') &&
+      !window.location.pathname.startsWith('/register')
+    ) {
+      window.location.href = '/login';
+    }
+    throw new ApiError(401, 'Unauthorized');
   }
 
-  const json = (await response.json()) as ApiResponse<T> | ApiError;
+  if (response.status === 204) {
+    return { success: true, message: 'OK', data: null as T, code: 204 };
+  }
 
-  if (!response.ok || !json.success) {
-    const error = json as ApiError;
-    throw new ApiFetchError(
-      error.message ?? 'Request failed',
-      response.status,
-      error.errors,
+  const text = await response.text();
+  if (!text) {
+    throw new ApiError(response.status, 'Empty response from server');
+  }
+
+  const data = JSON.parse(text) as ApiResponse<T>;
+
+  if (!data.success) {
+    throw new ApiError(
+      data.code || response.status,
+      data.message || 'Request failed',
+      data.errors as Record<string, string[]> | undefined,
     );
   }
 
-  return (json as ApiResponse<T>).data;
+  return data;
+}
+
+export { ApiError };
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const res = await apiFetch<T>(path);
+  return res.data;
+}
+
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const res = await apiFetch<T>(path, {
+    method: 'POST',
+    body: body instanceof FormData ? body : JSON.stringify(body),
+  });
+  return res.data;
+}
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await apiFetch<T>(path, {
+    method: 'PATCH',
+    body: body instanceof FormData ? body : JSON.stringify(body),
+  });
+  return res.data;
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await apiFetch<T>(path, { method: 'DELETE' });
+  return res.data;
 }

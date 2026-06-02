@@ -1,62 +1,44 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { featuresApi } from '../../../../lib/api/features';
+import { Toggle } from '../../../../components/ui/Toggle';
+import { Skeleton } from '../../../../components/ui/Skeleton';
 import { toast } from 'sonner';
-import { Card, CardContent, Toggle } from '@/components/ui';
-import { getAdminFeatures, updateFeature } from '@/lib/api/features';
-import type { FeatureFlag } from '@/types';
+import type { FeatureFlag } from '../../../../types';
 
-export default function AdminFeatureFlagsPage() {
-  const [features, setFeatures] = useState<FeatureFlag[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function FeatureFlagsPage() {
+  const [flags, setFlags] = useState<FeatureFlag[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const load = () => {
-    getAdminFeatures()
-      .then(setFeatures)
-      .catch(() => setFeatures([]))
-      .finally(() => setLoading(false));
-  };
+  useEffect(() => {
+    featuresApi.getAll().then(setFlags).catch(() => setFlags([])).finally(() => setIsLoading(false));
+  }, []);
 
-  useEffect(load, []);
-
-  const handleToggle = async (feature: FeatureFlag) => {
+  const handleToggle = async (name: string) => {
     try {
-      await updateFeature(feature.key, !feature.enabled);
-      toast.success(`${feature.name} ${!feature.enabled ? 'enabled' : 'disabled'}`);
-      load();
-    } catch {
-      toast.error('Failed to update feature flag');
-    }
+      const updated = await featuresApi.toggle(name);
+      setFlags((prev) => prev.map((f) => f.name === name ? updated : f));
+      toast.success(`${name} ${updated.isEnabled ? 'enabled' : 'disabled'}`);
+    } catch { toast.error('Failed to toggle flag'); }
   };
 
-  if (loading) return <p className="text-muted">Loading feature flags...</p>;
+  if (isLoading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16" />)}</div>;
 
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-bold">Feature Flags</h1>
-      <div className="grid max-w-2xl gap-4">
-        {features.map((feature) => (
-          <Card key={feature.key}>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">{feature.name}</h3>
-                  {feature.description && (
-                    <p className="mt-1 text-sm text-muted">{feature.description}</p>
-                  )}
-                  <p className="mt-1 font-mono text-xs text-muted">{feature.key}</p>
-                </div>
-                <Toggle
-                  checked={feature.enabled}
-                  onChange={() => handleToggle(feature)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+      <h1 className="text-2xl font-bold mb-6">Feature Flags</h1>
+      <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] divide-y divide-[var(--color-border)]">
+        {flags.map((flag) => (
+          <div key={flag.name} className="flex items-center justify-between px-6 py-4">
+            <div>
+              <p className="font-medium capitalize">{flag.name.replace(/_/g, ' ')}</p>
+              {flag.description && <p className="text-sm text-[var(--color-text-muted)]">{flag.description}</p>}
+            </div>
+            <Toggle checked={flag.isEnabled} onChange={() => handleToggle(flag.name)} />
+          </div>
         ))}
-        {features.length === 0 && (
-          <p className="text-muted">No feature flags configured</p>
-        )}
+        {flags.length === 0 && <p className="text-center py-8 text-[var(--color-text-muted)]">No feature flags.</p>}
       </div>
     </div>
   );

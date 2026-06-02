@@ -1,34 +1,38 @@
-import { apiFetch } from './apiFetch';
-import { normalizeCart } from './normalize';
-import type { Cart } from '@/types/cart';
+import { apiGet, apiPost, apiPatch, apiDelete, apiFetch } from './apiFetch';
+import type { Cart } from '../../types';
 
-export async function getCart(): Promise<Cart> {
-  const cart = await apiFetch<Record<string, unknown>>('/cart');
-  return normalizeCart(cart);
+export interface GuestCartItem {
+  productId: string;
+  variantId?: string;
+  quantity: number;
 }
 
-export async function addToCart(productId: number, quantity = 1): Promise<Cart> {
-  const cart = await apiFetch<Record<string, unknown>>('/cart/items', {
-    method: 'POST',
-    body: { product_id: productId, quantity },
-  });
-  return normalizeCart(cart);
-}
+export const cartApi = {
+  getCart: () => apiGet<Cart>('/api/v1/cart'),
+  addItem: (data: GuestCartItem) => apiPost<Cart>('/api/v1/cart/items', data),
+  updateItem: (itemId: string, quantity: number) =>
+    apiPatch<Cart>(`/api/v1/cart/items/${itemId}`, { quantity }),
+  removeItem: (itemId: string) => apiDelete<Cart>(`/api/v1/cart/items/${itemId}`),
+  mergeCart: (items: GuestCartItem[]) => apiPost<Cart>('/api/v1/cart/merge', { items }),
+  clearCart: () => apiDelete<null>('/api/v1/cart'),
+};
 
-export async function updateCartItem(itemId: number, quantity: number): Promise<Cart> {
-  const cart = await apiFetch<Record<string, unknown>>(`/cart/items/${itemId}`, {
+export const getCart = () => apiFetch<Cart>('/api/v1/cart');
+
+export const addItem = (payload: { productId: string; variantId?: string; quantity: number }) =>
+  apiFetch<Cart>('/api/v1/cart/items', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateItem = (itemId: string, quantity: number) =>
+  apiFetch<Cart>(`/api/v1/cart/items/${itemId}`, {
     method: 'PATCH',
-    body: { quantity },
+    body: JSON.stringify({ quantity }),
   });
-  return normalizeCart(cart);
-}
 
-export async function removeCartItem(itemId: number): Promise<Cart> {
-  const cart = await apiFetch<Record<string, unknown>>(`/cart/items/${itemId}`, { method: 'DELETE' });
-  return normalizeCart(cart);
-}
+export const removeItem = (itemId: string) =>
+  apiFetch<Cart>(`/api/v1/cart/items/${itemId}`, { method: 'DELETE' });
 
-export async function mergeCart(): Promise<Cart> {
-  const cart = await apiFetch<Record<string, unknown>>('/cart/merge', { method: 'POST' });
-  return normalizeCart(cart);
-}
+export const mergeCart = (guestItems: GuestCartItem[]) =>
+  apiFetch<Cart>('/api/v1/cart/merge', {
+    method: 'POST',
+    body: JSON.stringify({ items: guestItems }),
+  });

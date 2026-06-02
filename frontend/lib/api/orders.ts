@@ -1,105 +1,70 @@
-import { env } from '@/config/env';
-import { apiFetch } from './apiFetch';
-import { mapCheckoutPayload, normalizeOrder } from './normalize';
-import type { PaginatedResponse } from '@/types';
-import type { Order } from '@/types/order';
-import type { CheckoutFormData } from '@/validators';
+import { apiGet, apiPost, apiPatch, apiFetch } from './apiFetch';
+import type { Order } from '../../types';
+import type { PaginatedResponse } from '../../types/api';
 
-export interface CreateOrderResponse {
-  order: Order;
-  payment: {
-    redirect_url?: string;
-    payment_url?: string;
+export interface CreateOrderDto {
+  currency?: string;
+  shippingAddress?: {
+    name: string;
+    address: string;
+    city: string;
+    phone: string;
   };
 }
 
-function normalizePaginatedOrders(
-  response: PaginatedResponse<Record<string, unknown>>,
-): PaginatedResponse<Order> {
-  return {
-    ...response,
-    data: response.data.map((item) => normalizeOrder(item)),
-  };
-}
+export const ordersApi = {
+  getOrders: (page = 1) =>
+    apiGet<PaginatedResponse<Order>>(`/api/v1/orders?page=${page}`),
+  getOrder: (id: string) => apiGet<Order>(`/api/v1/orders/${id}`),
+  createOrder: (data: CreateOrderDto) => apiPost<Order>('/api/v1/orders', data),
+  getDownloadUrl: (orderId: string, itemId: string) =>
+    apiPost<{ url: string }>(`/api/v1/orders/${orderId}/items/${itemId}/download`),
+  
+  // Admin
+  adminGetOrders: (page = 1, state?: string) =>
+    apiGet<PaginatedResponse<Order>>(
+      `/api/v1/orders/admin/all?page=${page}${state ? `&state=${state}` : ''}`,
+    ),
+  adminGetOrder: (id: string) => apiGet<Order>(`/api/v1/orders/admin/${id}`),
+  adminTransitionState: (id: string, state: string) =>
+    apiPatch<Order>(`/api/v1/orders/admin/${id}/state`, { state }),
+  adminUpdateTracking: (id: string, trackingNumber: string) =>
+    apiPatch<Order>(`/api/v1/orders/admin/${id}/tracking`, { trackingNumber }),
+};
 
-export async function getOrders(): Promise<Order[]> {
-  const response = await apiFetch<PaginatedResponse<Record<string, unknown>>>('/orders');
-  return normalizePaginatedOrders(response).data;
-}
+export const getOrders = (params?: { cursor?: string; limit?: number }) => {
+  const qs = new URLSearchParams();
+  if (params?.cursor) qs.set('cursor', params.cursor);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<PaginatedResponse<Order>>(`/api/v1/orders${q}`);
+};
 
-export async function getOrder(orderNumber: string): Promise<Order> {
-  const order = await apiFetch<Record<string, unknown>>(`/orders/${orderNumber}`);
-  return normalizeOrder(order);
-}
+export const getOrder = (id: string) =>
+  apiFetch<Order>(`/api/v1/orders/${id}`);
 
-export async function createOrder(data: CheckoutFormData): Promise<CreateOrderResponse> {
-  const response = await apiFetch<{
-    order: Record<string, unknown>;
-    payment: CreateOrderResponse['payment'];
-  }>('/orders', {
+export const createOrder = (payload: CreateOrderDto) =>
+  apiFetch<Order>('/api/v1/orders', {
     method: 'POST',
-    body: mapCheckoutPayload(data),
+    body: JSON.stringify(payload),
   });
 
-  return {
-    order: normalizeOrder(response.order),
-    payment: response.payment ?? {},
-  };
-}
-
-export async function getAdminOrders(params?: {
-  status?: string;
-  page?: number;
-  search?: string;
-}): Promise<PaginatedResponse<Order>> {
-  const response = await apiFetch<PaginatedResponse<Record<string, unknown>>>('/admin/orders', { params });
-  return normalizePaginatedOrders(response);
-}
-
-export async function shipOrder(id: number): Promise<Order> {
-  const order = await apiFetch<Record<string, unknown>>(`/admin/orders/${id}/ship`, { method: 'POST' });
-  return normalizeOrder(order);
-}
-
-export async function deliverOrder(id: number): Promise<Order> {
-  const order = await apiFetch<Record<string, unknown>>(`/admin/orders/${id}/deliver`, { method: 'POST' });
-  return normalizeOrder(order);
-}
-
-export async function cancelOrder(id: number): Promise<Order> {
-  const order = await apiFetch<Record<string, unknown>>(`/admin/orders/${id}/cancel`, { method: 'POST' });
-  return normalizeOrder(order);
-}
-
-export async function refundOrder(id: number): Promise<Order> {
-  const order = await apiFetch<Record<string, unknown>>(`/admin/orders/${id}/refund`, { method: 'POST' });
-  return normalizeOrder(order);
-}
-
-export async function downloadOrderItem(orderNumber: string, itemId: number): Promise<string> {
-  const response = await apiFetch<{ download_url: string }>(
-    `/orders/${orderNumber}/items/${itemId}/download`,
-    { method: 'POST' },
+export const getDownloadUrl = (orderId: string, itemId: string) =>
+  apiFetch<{ url: string }>(
+    `/api/v1/orders/${orderId}/items/${itemId}/download`
   );
-  return response.download_url;
-}
 
-export async function downloadOrdersReport(from?: string, to?: string): Promise<void> {
-  const params = new URLSearchParams();
-  if (from) params.set('from', from);
-  if (to) params.set('to', to);
+export const adminGetOrders = (params?: { state?: string; cursor?: string; limit?: number }) => {
+  const qs = new URLSearchParams();
+  if (params?.state) qs.set('state', params.state);
+  if (params?.cursor) qs.set('cursor', params.cursor);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<PaginatedResponse<Order>>(`/api/v1/orders/admin/all${q}`);
+};
 
-  const url = `${env.apiUrl}/admin/reports/orders.csv?${params.toString()}`;
-  const response = await fetch(url, { credentials: 'include' });
-
-  if (!response.ok) {
-    throw new Error('Failed to download report');
-  }
-
-  const blob = await response.blob();
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'orders-report.csv';
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
+export const adminUpdateOrderState = (id: string, state: string) =>
+  apiFetch<Order>(`/api/v1/orders/admin/${id}/state`, {
+    method: 'PATCH',
+    body: JSON.stringify({ state }),
+  });

@@ -1,90 +1,103 @@
-'use client';
-
-import Link from 'next/link';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
-import { Calendar, MapPin, ArrowRight } from 'lucide-react';
-import { Badge, Card } from '@/components/ui';
-import type { Event } from '@/types';
+import Link from 'next/link';
+import { CalendarDays, MapPin } from 'lucide-react';
+import { getEvents } from '@/lib/api/events';
+import { formatDate } from '@/lib/utils';
+import Badge from '@/components/ui/Badge';
 
-interface UpcomingEventsProps {
-  events: Event[];
-}
+export default async function UpcomingEvents() {
+  let events = [];
+  try {
+    const res = await getEvents({ limit: 3, isFeatured: true });
+    events = res.data.items;
+  } catch {
+    return null;
+  }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-KE', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-export function UpcomingEvents({ events }: UpcomingEventsProps) {
   if (events.length === 0) return null;
 
   return (
-    <section className="bg-surface py-16">
-      <div className="container-page">
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <h2 className="text-3xl font-bold">Upcoming Events</h2>
-            <p className="mt-2 text-muted">Join us at our next community gatherings</p>
-          </div>
-          <Link
-            href="/events"
-            className="hidden items-center gap-1 text-sm font-medium text-primary hover:underline sm:flex"
-          >
-            All Events <ArrowRight className="h-4 w-4" />
-          </Link>
+    <section className="py-16 bg-[var(--color-background)] px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-[var(--color-text)]">
+            Upcoming Events
+          </h2>
+          <p className="text-[var(--color-text-muted)] mt-1">
+            Don&apos;t miss out on our latest events
+          </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {events.slice(0, 3).map((event, i) => (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <Link href={`/events/${event.slug}`}>
-                <Card hover padding="none" className="overflow-hidden">
-                  <div className="relative h-48 bg-primary/10">
-                    {event.image_url ? (
-                      <Image
-                        src={event.image_url}
-                        alt={event.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Calendar className="h-12 w-12 text-primary" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {events.map((event) => (
+            <Link key={event.id} href={`/events/${event.slug}`} className="group">
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                {/* Cover image */}
+                <div className="relative h-44 bg-gradient-to-br from-[var(--color-primary)]/20 to-[var(--color-primary)]/5">
+                  {event.coverImageUrl ? (
+                    <Image
+                      src={event.coverImageUrl}
+                      alt={event.title}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <CalendarDays className="h-12 w-12 text-[var(--color-primary)]/30" />
+                    </div>
+                  )}
+                  {event.isFeatured && (
+                    <div className="absolute top-3 left-3">
+                      <Badge variant="primary">Featured</Badge>
+                    </div>
+                  )}
+                  {/* Date badge */}
+                  <div className="absolute top-3 right-3 bg-white rounded-lg px-2 py-1 text-center shadow-sm">
+                    <p className="text-xs font-bold text-[var(--color-primary)]">
+                      {new Date(event.startsAt).toLocaleDateString('en-KE', {
+                        month: 'short',
+                      })}
+                    </p>
+                    <p className="text-lg font-bold leading-none text-[var(--color-text)]">
+                      {new Date(event.startsAt).getDate()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-semibold text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors line-clamp-2">
+                    {event.title}
+                  </h3>
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                      <span>{formatDate(event.startsAt)}</span>
+                    </div>
+                    {event.location && (
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{event.location}</span>
                       </div>
                     )}
                   </div>
-                  <div className="p-4">
-                    <Badge variant="primary" className="mb-2">
-                      Event
-                    </Badge>
-                    <h3 className="font-semibold">{event.title}</h3>
-                    <div className="mt-2 space-y-1 text-sm text-muted">
-                      <p className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(event.starts_at)}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        {event.location}
-                      </p>
-                    </div>
+                  <div className="mt-3">
+                    <span className="text-xs font-medium text-[var(--color-primary)] group-hover:underline">
+                      Learn more →
+                    </span>
                   </div>
-                </Card>
-              </Link>
-            </motion.div>
+                </div>
+              </div>
+            </Link>
           ))}
+        </div>
+
+        <div className="mt-8 text-center">
+          <Link
+            href="/events"
+            className="inline-flex items-center text-sm font-medium text-[var(--color-primary)] hover:underline"
+          >
+            View all events →
+          </Link>
         </div>
       </div>
     </section>

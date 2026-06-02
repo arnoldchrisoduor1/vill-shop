@@ -1,17 +1,13 @@
-import type { Product } from './product';
+import type { Product, ProductVariant } from './product';
 
 export interface CartItem {
-  id: number;
-  product_id: number;
+  id: string;
   product: Product;
+  variant?: ProductVariant;
   quantity: number;
-  unit_price: number;
-  total_price: number;
 }
 
 export interface Cart {
-  id: number;
+  id: string;
   items: CartItem[];
-  subtotal: number;
-  item_count: number;
 }

@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 export const heroSlideSchema = z.object({
-  title: z.string().min(2, 'Title is required'),
-  subtitle: z.string().optional(),
-  cta_text: z.string().optional(),
-  cta_url: z.string().optional(),
-  image_url: z.string().url('Valid image URL required'),
-  sort_order: z.coerce.number().int().min(0).default(0),
-  is_active: z.boolean().default(true),
+  headline: z.string().min(2, 'Headline is required'),
+  subtext: z.string().optional(),
+  ctaLabel: z.string().optional(),
+  ctaUrl: z.string().optional(),
+  imageUrl: z.string().optional(),
+  sortOrder: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
 });
 
 export type HeroSlideFormData = z.infer<typeof heroSlideSchema>;

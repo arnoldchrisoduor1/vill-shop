@@ -1,79 +1,67 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useParams, useRouter } from 'next/navigation';
+import { eventsApi } from '../../../../../../lib/api/events';
+import { Input } from '../../../../../../components/ui/Input';
+import { Textarea } from '../../../../../../components/ui/Textarea';
+import { Button } from '../../../../../../components/ui/Button';
 import { toast } from 'sonner';
-import { Button, Input, Textarea, Toggle, Card, CardContent } from '@/components/ui';
-import { getAdminEvents, updateEvent } from '@/lib/api/events';
-import { eventSchema, type EventFormData } from '@/validators';
-import { ApiFetchError } from '@/lib/api';
+import type { ShopEvent } from '../../../../../../types';
 
-export default function EditEventPage({ params }: { params: { id: string } }) {
+export default function EditEventPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const [event, setEvent] = useState<ShopEvent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingEvent, setLoadingEvent] = useState(true);
-
-  const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<EventFormData>({
-    resolver: zodResolver(eventSchema),
-  });
+  const [image, setImage] = useState<File | null>(null);
 
   useEffect(() => {
-    getAdminEvents()
-      .then((r) => {
-        const event = r.data.find((e) => e.id === Number(params.id));
-        if (event) {
-          reset({
-            title: event.title,
-            description: event.description,
-            location: event.location,
-            starts_at: event.starts_at.slice(0, 16),
-            ends_at: event.ends_at.slice(0, 16),
-            max_attendees: event.max_attendees,
-            is_active: event.is_active,
-          });
-        }
-      })
-      .finally(() => setLoadingEvent(false));
-  }, [params.id, reset]);
+    if (!id) return;
+    eventsApi.getById(id).then(setEvent).catch(() => toast.error('Event not found'));
+  }, [id]);
 
-  const onSubmit = async (data: EventFormData) => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!event || !id) return;
     setIsLoading(true);
     try {
-      await updateEvent(Number(params.id), data);
-      toast.success('Event updated');
+      const formData = new FormData();
+      formData.append('title', event.title);
+      formData.append('description', event.description);
+      if (event.location) formData.append('location', event.location);
+      if (image) formData.append('image', image);
+      await eventsApi.update(id, formData);
+      toast.success('Event updated!');
       router.push('/admin/events');
-    } catch (err) {
-      toast.error(err instanceof ApiFetchError ? err.message : 'Failed to update event');
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Update failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (loadingEvent) return <p className="text-muted">Loading...</p>;
+  if (!event) return <div className="animate-pulse h-64 bg-[var(--color-border)] rounded" />;
 
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-bold">Edit Event</h1>
-      <Card className="max-w-2xl">
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input label="Title" error={errors.title?.message} {...register('title')} />
-            <Textarea label="Description" error={errors.description?.message} {...register('description')} />
-            <Input label="Location" error={errors.location?.message} {...register('location')} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Starts At" type="datetime-local" error={errors.starts_at?.message} {...register('starts_at')} />
-              <Input label="Ends At" type="datetime-local" error={errors.ends_at?.message} {...register('ends_at')} />
-            </div>
-            <Toggle label="Active" checked={watch('is_active')} onChange={(v) => setValue('is_active', v)} />
-            <div className="flex gap-2">
-              <Button type="submit" isLoading={isLoading}>Save Changes</Button>
-              <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <h1 className="text-2xl font-bold mb-8">Edit Event</h1>
+      <form onSubmit={handleSave} className="max-w-2xl space-y-4">
+        <Input label="Title" value={event.title} onChange={(e) => setEvent({ ...event, title: e.target.value })} />
+        <Textarea label="Description" value={event.description} onChange={(e) => setEvent({ ...event, description: e.target.value })} rows={5} />
+        <Input label="Location" value={event.location ?? ''} onChange={(e) => setEvent({ ...event, location: e.target.value })} />
+        {event.coverImageUrl && (
+          <img src={event.coverImageUrl} alt="" className="h-32 w-auto rounded border border-[var(--color-border)]" />
+        )}
+        <div>
+          <label className="block text-sm font-medium mb-2">Replace Cover Image</label>
+          <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] ?? null)} />
+        </div>
+        <div className="flex gap-3">
+          <Button type="submit" isLoading={isLoading}>Save</Button>
+          <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+        </div>
+      </form>
     </div>
   );
 }

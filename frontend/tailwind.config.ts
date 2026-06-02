@@ -9,40 +9,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        primary: 'var(--color-primary)',
+        'primary-dark': 'var(--color-primary-dark)',
+        secondary: 'var(--color-secondary)',
+        'secondary-dark': 'var(--color-secondary-dark)',
         background: 'var(--color-background)',
-        foreground: 'var(--color-foreground)',
-        primary: {
-          DEFAULT: 'var(--color-primary)',
-          dark: 'var(--color-primary-dark)',
-          light: 'var(--color-primary-light)',
-        },
-        secondary: {
-          DEFAULT: 'var(--color-secondary)',
-          dark: 'var(--color-secondary-dark)',
-          light: 'var(--color-secondary-light)',
-        },
         surface: 'var(--color-surface)',
-        muted: 'var(--color-muted)',
+        'text-base': 'var(--color-text)',
+        'text-muted': 'var(--color-text-muted)',
         border: 'var(--color-border)',
-        error: 'var(--color-error)',
-        warning: 'var(--color-warning)',
-        success: 'var(--color-success)',
       },
       fontFamily: {
-        heading: ['var(--font-heading)'],
-        body: ['var(--font-body)'],
-        mono: ['var(--font-mono)'],
+        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
       },
       borderRadius: {
-        sm: 'var(--radius-sm)',
-        md: 'var(--radius-md)',
-        lg: 'var(--radius-lg)',
-        xl: 'var(--radius-xl)',
-      },
-      boxShadow: {
-        sm: 'var(--shadow-sm)',
-        md: 'var(--shadow-md)',
-        lg: 'var(--shadow-lg)',
+        DEFAULT: 'var(--radius)',
       },
     },
   },

@@ -1,41 +1,62 @@
-import { apiFetch } from './apiFetch';
-import type { PaginatedResponse } from '@/types';
-import type { Event } from '@/types/event';
-import type { EventFormData } from '@/validators';
+import { apiGet, apiPatch, apiDelete, apiFetch } from './apiFetch';
+import type { ShopEvent } from '../../types';
+import type { PaginatedResponse } from '../../types/api';
 
-export async function getEvents(): Promise<Event[]> {
-  const response = await apiFetch<PaginatedResponse<Event>>('/events', { params: { per_page: 50 } });
-  return response.data;
-}
+export const eventsApi = {
+  getAll: () => apiGet<ShopEvent[]>('/api/v1/events'),
+  getAdminAll: () => apiGet<ShopEvent[]>('/api/v1/events/admin/all'),
+  getById: (id: string) => apiGet<ShopEvent>(`/api/v1/events/admin/${id}`),
+  getFeatured: () => apiGet<ShopEvent[]>('/api/v1/events/featured'),
+  getBySlug: (slug: string) => apiGet<ShopEvent>(`/api/v1/events/${slug}`),
+  create: (data: FormData | object) =>
+    apiFetch<ShopEvent>('/api/v1/events', {
+      method: 'POST',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
+  update: (id: string, data: FormData | object) =>
+    apiFetch<ShopEvent>(`/api/v1/events/${id}`, {
+      method: 'PATCH',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
+  delete: (id: string) => apiDelete<null>(`/api/v1/events/${id}`),
+  togglePublished: (id: string) => apiPatch<ShopEvent>(`/api/v1/events/${id}/published`),
+  toggleFeatured: (id: string) => apiPatch<ShopEvent>(`/api/v1/events/${id}/featured`),
+};
 
-export async function getUpcomingEvents(): Promise<Event[]> {
-  const events = await getEvents();
-  const now = Date.now();
-  return events
-    .filter((event) => event.is_active && new Date(event.starts_at).getTime() >= now)
-    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
-    .slice(0, 6);
-}
+export const getEvents = (params?: { limit?: number; isFeatured?: boolean }) => {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set('limit', String(params.limit));
+  if (params?.isFeatured !== undefined) qs.set('isFeatured', String(params.isFeatured));
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<PaginatedResponse<ShopEvent>>(`/api/v1/events${q}`);
+};
 
-export async function getEvent(slug: string): Promise<Event> {
-  return apiFetch<Event>(`/events/${slug}`);
-}
+export const getEvent = (slug: string) =>
+  apiFetch<ShopEvent>(`/api/v1/events/${slug}`);
 
-export async function createEvent(data: EventFormData | FormData): Promise<Event> {
-  return apiFetch<Event>('/admin/events', { method: 'POST', body: data });
-}
+export const adminCreateEvent = (data: Partial<ShopEvent>) =>
+  apiFetch<ShopEvent>('/api/v1/admin/events', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 
-export async function updateEvent(
-  id: number,
-  data: EventFormData | FormData,
-): Promise<Event> {
-  return apiFetch<Event>(`/admin/events/${id}`, { method: 'PUT', body: data });
-}
+export const adminUpdateEvent = (id: string, data: Partial<ShopEvent>) =>
+  apiFetch<ShopEvent>(`/api/v1/admin/events/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
 
-export async function deleteEvent(id: number): Promise<void> {
-  return apiFetch<void>(`/admin/events/${id}`, { method: 'DELETE' });
-}
+export const adminDeleteEvent = (id: string) =>
+  apiFetch<null>(`/api/v1/admin/events/${id}`, { method: 'DELETE' });
 
-export async function getAdminEvents(): Promise<PaginatedResponse<Event>> {
-  return apiFetch<PaginatedResponse<Event>>('/admin/events');
-}
+export const adminTogglePublished = (id: string, isPublished: boolean) =>
+  apiFetch<ShopEvent>(`/api/v1/admin/events/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isPublished }),
+  });
+
+export const adminToggleEventFeatured = (id: string, isFeatured: boolean) =>
+  apiFetch<ShopEvent>(`/api/v1/admin/events/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isFeatured }),
+  });

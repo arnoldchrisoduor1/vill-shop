@@ -1,32 +1,23 @@
-import { apiFetch } from './apiFetch';
-import { normalizeFeatureFlags } from './normalize';
-import type { FeatureFlag } from '@/types/feature';
+import { apiGet, apiPatch, apiFetch } from './apiFetch';
+import type { FeatureFlag } from '../../types';
 
-export async function getFeatures(): Promise<FeatureFlag[]> {
-  const data = await apiFetch<unknown>('/features');
-  return normalizeFeatureFlags(data);
-}
+export const featuresApi = {
+  getAll: () => apiGet<FeatureFlag[]>('/api/v1/features'),
+  getFlag: (name: string) => apiGet<FeatureFlag>(`/api/v1/features/${name}`),
+  toggle: (name: string) => apiPatch<FeatureFlag>(`/api/v1/features/${name}`),
+};
 
-export async function getAdminFeatures(): Promise<FeatureFlag[]> {
-  const data = await apiFetch<unknown>('/admin/feature-flags');
-  return normalizeFeatureFlags(data);
-}
+export const getFeatures = () =>
+  apiFetch<FeatureFlag[]>('/api/v1/features');
 
-export async function updateFeature(
-  key: string,
-  enabled: boolean,
-  payload?: Record<string, unknown>,
-): Promise<FeatureFlag> {
-  const flag = await apiFetch<Record<string, unknown>>(`/admin/feature-flags/${key}`, {
-    method: 'PUT',
-    body: { enabled, payload },
+export const getFeature = (name: string) =>
+  apiFetch<FeatureFlag>(`/api/v1/features/${name}`);
+
+export const adminGetFeatures = () =>
+  apiFetch<FeatureFlag[]>('/api/v1/admin/features');
+
+export const adminToggleFeature = (name: string, isEnabled: boolean) =>
+  apiFetch<FeatureFlag>(`/api/v1/admin/features/${name}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isEnabled }),
   });
-
-  return {
-    key: String(flag.key),
-    name: String(flag.key).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-    description: flag.description as string | undefined,
-    enabled: Boolean(flag.enabled),
-    value: flag.payload as FeatureFlag['value'],
-  };
-}

@@ -1,30 +1,34 @@
-export interface PublicStats {
-  total_orders: number;
-  total_products: number;
-  total_customers: number;
+export interface StoreStats {
+  totalOrders: number;
+  totalProducts: number;
+  totalCustomers: number;
 }
 
-export interface DashboardStats {
-  total_revenue: number;
-  total_orders: number;
-  total_customers: number;
-  total_products: number;
-  revenue_change: number;
-  orders_change: number;
-  customers_change: number;
-  low_stock_count: number;
-}
-
-export interface SalesReport {
-  period: string;
-  revenue: number;
-  orders: number;
-  average_order_value: number;
-}
-
-export interface TopProduct {
-  product_id: number;
-  product_name: string;
-  total_sold: number;
-  revenue: number;
+export interface AdminDashboard {
+  revenueToday: number;
+  revenueWeek: number;
+  revenueMonth: number;
+  revenue: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    total: number;
+  };
+  stats: StoreStats;
+  recentOrders: Array<{
+    id: string;
+    orderNumber: string;
+    state: string;
+    total: number;
+    currency: string;
+    customerName: string;
+    user: { name: string };
+    createdAt: string;
+  }>;
+  lowStockProducts: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+  }>;
 }

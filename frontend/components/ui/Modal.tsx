@@ -1,79 +1,82 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
 
-export interface ModalProps {
-  open: boolean;
+interface ModalProps {
+  isOpen: boolean;
   onClose: () => void;
   title?: string;
-  children: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  children: React.ReactNode;
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 const sizes = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
+  sm: 'max-w-sm',
+  md: 'max-w-md',
   lg: 'max-w-2xl',
 };
 
-export function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  size = 'md',
-  className,
-}: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, className, size = 'md' }: ModalProps) {
   useEffect(() => {
-    if (open) {
+    if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
-    return () => {
-      document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
     };
-  }, [open]);
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
 
   return (
     <AnimatePresence>
-      {open && (
+      {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: 'spring', duration: 0.3 }}
             className={cn(
-              'relative z-10 w-full rounded-xl border border-border bg-surface p-6 shadow-lg',
+              'relative w-full bg-[var(--color-surface)] rounded-[var(--radius)] shadow-xl',
               sizes[size],
               className,
             )}
           >
-            <div className="mb-4 flex items-center justify-between">
-              {title && <h2 className="text-lg font-semibold">{title}</h2>}
-              <button
-                type="button"
-                onClick={onClose}
-                className="ml-auto rounded-lg p-1 text-muted hover:bg-border/50 hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            {children}
+            {title && (
+              <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
+                <h2 className="text-lg font-semibold text-[var(--color-text)]">{title}</h2>
+                <button
+                  onClick={onClose}
+                  className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            )}
+            <div className="p-6">{children}</div>
           </motion.div>
         </div>
       )}
     </AnimatePresence>
   );
 }
+
+export default Modal;

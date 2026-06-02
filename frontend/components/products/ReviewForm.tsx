@@ -3,111 +3,71 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
+import { reviewsApi } from '../../lib/api/reviews';
+import { reviewSchema, type ReviewFormData } from '../../validators/review';
+import { Button } from '../ui/Button';
+import { Textarea } from '../ui/Textarea';
 import { toast } from 'sonner';
-import { Button, Textarea } from '@/components/ui';
-import { useAuth } from '@/context';
-import { createReview } from '@/lib/api/reviews';
-import { reviewSchema, type ReviewFormData } from '@/validators';
-import { ApiFetchError } from '@/lib/api';
 
-interface ReviewFormProps {
-  productId: number;
-  onSuccess?: () => void;
-}
-
-export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
-  const { isAuthenticated } = useAuth();
-  const [hoverRating, setHoverRating] = useState(0);
+export function ReviewForm({ productId }: { productId: string }) {
+  const [rating, setRating] = useState(0);
+  const [hovered, setHovered] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [image, setImage] = useState<File | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<ReviewFormData>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
-    defaultValues: { rating: 0, comment: '' },
   });
 
-  const rating = watch('rating');
-
-  if (!isAuthenticated) {
-    return (
-      <p className="text-sm text-muted">
-        Please <a href="/login" className="text-primary hover:underline">sign in</a> to leave a review.
-      </p>
-    );
-  }
-
   const onSubmit = async (data: ReviewFormData) => {
+    if (rating === 0) { toast.error('Please select a rating'); return; }
     setIsLoading(true);
     try {
-      await createReview(productId, data);
+      const formData = new FormData();
+      formData.append('rating', String(rating));
+      if (data.comment) formData.append('comment', data.comment);
+      if (image) formData.append('image', image);
+      await reviewsApi.createReview(productId, formData);
       toast.success('Review submitted!');
       reset();
-      onSuccess?.();
-    } catch (err) {
-      const message =
-        err instanceof ApiFetchError ? err.message : 'Failed to submit review';
-      toast.error(message);
+      setRating(0);
+      setImage(null);
+      window.location.reload();
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to submit review');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <motion.form
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-4 rounded-xl border border-border bg-surface p-6"
-    >
-      <h3 className="font-semibold">Write a Review</h3>
-
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <label className="mb-2 block text-sm font-medium">Rating</label>
+        <label className="text-sm font-medium mb-2 block">Rating</label>
         <div className="flex gap-1">
-          {Array.from({ length: 5 }).map((_, i) => {
-            const value = i + 1;
-            return (
-              <button
-                key={i}
-                type="button"
-                onMouseEnter={() => setHoverRating(value)}
-                onMouseLeave={() => setHoverRating(0)}
-                onClick={() => setValue('rating', value, { shouldValidate: true })}
-              >
-                <Star
-                  className={`h-6 w-6 ${
-                    value <= (hoverRating || rating)
-                      ? 'fill-warning text-warning'
-                      : 'text-border'
-                  }`}
-                />
-              </button>
-            );
-          })}
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button key={star} type="button"
+              onClick={() => setRating(star)}
+              onMouseEnter={() => setHovered(star)}
+              onMouseLeave={() => setHovered(0)}
+              className="focus:outline-none">
+              <Star className={`h-7 w-7 transition-colors ${star <= (hovered || rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+            </button>
+          ))}
         </div>
-        {errors.rating && (
-          <p className="mt-1 text-xs text-error">{errors.rating.message}</p>
-        )}
       </div>
-
       <Textarea
-        label="Review"
+        label="Comment (optional)"
         placeholder="Share your experience..."
-        error={errors.comment?.message}
         {...register('comment')}
+        error={errors.comment?.message}
       />
-
-      <Button type="submit" isLoading={isLoading}>
-        Submit Review
-      </Button>
-    </motion.form>
+      <div>
+        <label className="text-sm font-medium mb-2 block">Photo (optional)</label>
+        <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] ?? null)} />
+      </div>
+      <Button type="submit" isLoading={isLoading} className="w-full">Submit Review</Button>
+    </form>
   );
 }

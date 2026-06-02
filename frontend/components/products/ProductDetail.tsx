@@ -2,104 +2,75 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
-import { Minus, Plus, ShoppingCart, Star, Heart } from 'lucide-react';
-import { Badge, Button } from '@/components/ui';
-import { ReviewForm } from '@/components/products/ReviewForm';
-import { useCart } from '@/context';
-import { useWishlistStore } from '@/lib/store';
-import { getProduct } from '@/lib/api/products';
-import { getProductReviews } from '@/lib/api/reviews';
-import { formatCurrency } from '@/lib/utils';
-import type { Product } from '@/types';
-import type { Review } from '@/types';
+import { ShoppingCart, Heart, Star, Download, Package } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { ReviewForm } from './ReviewForm';
+import { useCartStore } from '../../lib/store/cartStore';
+import { useCartActions } from '../../lib/hooks/useCartActions';
+import { useWishlistActions, useIsInWishlist } from '../../lib/hooks/useWishlistActions';
+import { useAuth } from '../../context/AuthContext';
+import { formatPrice, formatDate } from '../../lib/utils';
+import { reviewsApi } from '../../lib/api/reviews';
+import { toast } from 'sonner';
+import type { Product, ProductVariant } from '../../types';
 
-interface ProductDetailProps {
-  slug: string;
-}
-
-export function ProductDetail({ slug }: ProductDetailProps) {
-  const [product, setProduct] = useState<Product | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [quantity, setQuantity] = useState(1);
+export function ProductDetail({ product }: { product: Product }) {
   const [selectedImage, setSelectedImage] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const { addToCart } = useCart();
-  const { toggleItem, hasItem } = useWishlistStore();
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [canReview, setCanReview] = useState(false);
+  const openCart = useCartStore((state) => state.openCart);
+  const { addToCart } = useCartActions();
+  const { toggleWishlist } = useWishlistActions();
+  const { user } = useAuth();
+  const isWished = useIsInWishlist(product.id);
 
-  const loadReviews = async (productId: number) => {
+  const images = product.media?.sort((a, b) => (a.isPrimary ? -1 : 1) - (b.isPrimary ? -1 : 1)) ?? [];
+  const price = selectedVariant?.priceKes ?? product.priceKes;
+  const displayPrice = product.priceDisplay ?? price;
+  const currency = product.currency ?? 'KES';
+  const stock = selectedVariant?.stock ?? product.stock;
+  const averageRating = product.averageRating ?? 0;
+  const reviews = (product as Product & { reviews?: Array<{ id: string; user: { name: string }; rating: number; comment?: string; createdAt: string }> }).reviews ?? [];
+
+  useEffect(() => {
+    if (!user) {
+      setCanReview(false);
+      return;
+    }
+    reviewsApi.canReview(product.id).then((res) => setCanReview(res.canReview)).catch(() => setCanReview(false));
+  }, [user, product.id]);
+
+  const handleAddToCart = async () => {
     try {
-      const data = await getProductReviews(productId);
-      setReviews(data);
-    } catch {
-      setReviews([]);
+      await addToCart(product, quantity, selectedVariant ?? undefined);
+      openCart();
+      toast.success(`${product.name} added to cart`);
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Could not add to cart');
     }
   };
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getProduct(slug);
-        setProduct(data);
-        await loadReviews(data.id);
-      } catch {
-        setProduct(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [slug]);
-
-  if (loading) {
-    return (
-      <div className="container-page py-16 text-center text-muted">
-        Loading product...
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="container-page py-16 text-center">
-        <h1 className="text-2xl font-bold">Product not found</h1>
-      </div>
-    );
-  }
-
-  const images = product.images?.length ? product.images : [];
-  const isWishlisted = hasItem(product.id);
-
   return (
-    <div className="container-page py-8">
-      <div className="grid gap-8 lg:grid-cols-2">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        {/* Images */}
         <div>
-          <div className="relative aspect-square overflow-hidden rounded-xl bg-border/30">
-            {images[selectedImage]?.url ? (
-              <Image
-                src={images[selectedImage].url}
-                alt={product.name}
-                fill
-                className="object-cover"
-                priority
-              />
+          <div className="relative aspect-square rounded-[var(--radius)] overflow-hidden bg-[var(--color-background)] mb-4">
+            {images[selectedImage] ? (
+              <Image src={images[selectedImage].url} alt={product.name} fill className="object-cover" priority />
             ) : (
-              <div className="flex h-full items-center justify-center text-muted">
-                No image
+              <div className="h-full flex items-center justify-center">
+                <Package className="h-24 w-24 text-[var(--color-border)]" />
               </div>
             )}
           </div>
           {images.length > 1 && (
-            <div className="mt-4 flex gap-2">
+            <div className="flex gap-2 overflow-x-auto">
               {images.map((img, i) => (
-                <button
-                  key={img.id}
-                  type="button"
-                  onClick={() => setSelectedImage(i)}
-                  className={`relative h-20 w-20 overflow-hidden rounded-lg border-2 ${
-                    i === selectedImage ? 'border-primary' : 'border-border'
-                  }`}
-                >
+                <button key={img.id} onClick={() => setSelectedImage(i)}
+                  className={`relative h-16 w-16 shrink-0 rounded overflow-hidden border-2 transition-colors ${i === selectedImage ? 'border-[var(--color-primary)]' : 'border-transparent'}`}>
                   <Image src={img.url} alt="" fill className="object-cover" />
                 </button>
               ))}
@@ -107,128 +78,128 @@ export function ProductDetail({ slug }: ProductDetailProps) {
           )}
         </div>
 
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-          <div className="mb-2 flex gap-2">
-            {product.is_on_sale && <Badge variant="error">Sale</Badge>}
-            {product.is_new && <Badge variant="secondary">New</Badge>}
-            {product.is_featured && <Badge variant="primary">Featured</Badge>}
+        {/* Info */}
+        <div>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                {product.category && <Badge variant="outline">{product.category.name}</Badge>}
+                {product.type === 'digital' && <Badge variant="secondary">Digital</Badge>}
+              </div>
+              <h1 className="text-3xl font-bold text-[var(--color-text)]">{product.name}</h1>
+            </div>
+            <button onClick={() => toggleWishlist(product.id)}
+              className="p-2 rounded-full border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors">
+              <Heart className={`h-5 w-5 ${isWished ? 'fill-red-500 text-red-500' : 'text-[var(--color-text-muted)]'}`} />
+            </button>
           </div>
 
-          <h1 className="text-3xl font-bold">{product.name}</h1>
-
-          {product.average_rating !== undefined && product.average_rating > 0 && (
-            <div className="mt-2 flex items-center gap-2">
+          {averageRating > 0 && (
+            <div className="flex items-center gap-2 mb-4">
               <div className="flex">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-4 w-4 ${
-                      i < Math.round(product.average_rating!)
-                        ? 'fill-warning text-warning'
-                        : 'text-border'
-                    }`}
-                  />
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star key={star} className={`h-4 w-4 ${star <= Math.round(averageRating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
                 ))}
               </div>
-              <span className="text-sm text-muted">
-                {product.average_rating.toFixed(1)} ({product.review_count} reviews)
+              <span className="text-sm text-[var(--color-text-muted)]">
+                {averageRating.toFixed(1)} ({product.reviewCount ?? reviews.length} reviews)
               </span>
             </div>
           )}
 
-          <div className="mt-4 flex items-baseline gap-3">
-            <span className="text-3xl font-bold text-primary">
-              {formatCurrency(product.price)}
-            </span>
-            {product.compare_at_price && product.compare_at_price > product.price && (
-              <span className="text-lg text-muted line-through">
-                {formatCurrency(product.compare_at_price)}
-              </span>
-            )}
+          <div className="text-3xl font-bold text-[var(--color-primary)] mb-6">
+            {formatPrice(Number(displayPrice), currency)}
           </div>
 
-          <p className="mt-4 text-muted">{product.description}</p>
-
-          <p className="mt-2 text-sm">
-            {product.stock > 0 ? (
-              <span className="text-secondary">In stock ({product.stock} available)</span>
-            ) : (
-              <span className="text-error">Out of stock</span>
-            )}
-          </p>
-
-          <div className="mt-6 flex items-center gap-4">
-            <div className="flex items-center rounded-lg border border-border">
-              <button
-                type="button"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="p-2 hover:bg-border/50"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="w-10 text-center">{quantity}</span>
-              <button
-                type="button"
-                onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                className="p-2 hover:bg-border/50"
-                disabled={quantity >= product.stock}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
+          {/* Variants */}
+          {product.variants && product.variants.length > 0 && (
+            <div className="mb-6">
+              <label className="text-sm font-medium mb-2 block">Variant</label>
+              <div className="flex flex-wrap gap-2">
+                {product.variants.filter(v => v.isActive).map((variant) => (
+                  <button key={variant.id}
+                    onClick={() => setSelectedVariant(selectedVariant?.id === variant.id ? null : variant)}
+                    className={`px-3 py-1.5 rounded-[var(--radius)] border text-sm transition-colors ${selectedVariant?.id === variant.id ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'}`}>
+                    {variant.name} — {formatPrice(Number(variant.priceKes), 'KES')}
+                  </button>
+                ))}
+              </div>
             </div>
+          )}
 
-            <Button
-              size="lg"
-              onClick={() => addToCart(product, quantity)}
-              disabled={product.stock <= 0}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              Add to Cart
-            </Button>
+          {/* Quantity + Add to cart */}
+          {product.type === 'physical' && (
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="w-8 h-8 rounded border border-[var(--color-border)] flex items-center justify-center hover:border-[var(--color-primary)]">
+                  −
+                </button>
+                <span className="w-12 text-center font-medium">{quantity}</span>
+                <button onClick={() => setQuantity(Math.min(stock, quantity + 1))}
+                  className="w-8 h-8 rounded border border-[var(--color-border)] flex items-center justify-center hover:border-[var(--color-primary)]">
+                  +
+                </button>
+              </div>
+              <span className="text-sm text-[var(--color-text-muted)]">{stock} in stock</span>
+            </div>
+          )}
 
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => toggleItem(product)}
-            >
-              <Heart
-                className={`h-5 w-5 ${isWishlisted ? 'fill-error text-error' : ''}`}
-              />
+          <div className="flex gap-3 mb-8">
+            <Button onClick={handleAddToCart} size="lg" className="flex-1" disabled={product.type === 'physical' && stock === 0}>
+              {product.type === 'digital' ? (
+                <><Download className="h-5 w-5" /> Buy Digital</>
+              ) : stock === 0 ? (
+                'Out of Stock'
+              ) : (
+                <><ShoppingCart className="h-5 w-5" /> Add to Cart</>
+              )}
             </Button>
           </div>
-        </motion.div>
+
+          {/* Description */}
+          <div className="prose prose-sm max-w-none">
+            <h3 className="font-semibold text-lg mb-2">Description</h3>
+            <p className="text-[var(--color-text-muted)] leading-relaxed whitespace-pre-line">{product.description}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-16 grid gap-8 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-4 text-xl font-semibold">Customer Reviews</h2>
-          {reviews.length === 0 ? (
-            <p className="text-muted">No reviews yet. Be the first!</p>
-          ) : (
-            <div className="space-y-4">
-              {reviews.map((review) => (
-                <div
-                  key={review.id}
-                  className="rounded-lg border border-border p-4"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="font-medium">{review.user?.name ?? 'Anonymous'}</span>
+      {/* Reviews */}
+      <div className="mt-16">
+        <h2 className="text-2xl font-bold mb-8">Reviews</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-4">
+            {reviews.length === 0 ? (
+              <p className="text-[var(--color-text-muted)]">No reviews yet. Be the first!</p>
+            ) : (
+              reviews.map((review) => (
+                <div key={review.id} className="border border-[var(--color-border)] rounded-[var(--radius)] p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">{review.user.name}</span>
                     <div className="flex">
-                      {Array.from({ length: review.rating }).map((_, i) => (
-                        <Star key={i} className="h-3 w-3 fill-warning text-warning" />
+                      {[1,2,3,4,5].map((s) => (
+                        <Star key={s} className={`h-4 w-4 ${s <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
                       ))}
                     </div>
                   </div>
-                  {review.comment && <p className="text-sm text-muted">{review.comment}</p>}
+                  {review.comment && <p className="text-sm text-[var(--color-text-muted)]">{review.comment}</p>}
+                  <p className="text-xs text-[var(--color-text-muted)] mt-2">{formatDate(review.createdAt)}</p>
                 </div>
-              ))}
+              ))
+            )}
+          </div>
+          {user && canReview ? (
+            <div>
+              <h3 className="font-semibold mb-4">Write a Review</h3>
+              <ReviewForm productId={product.id} />
             </div>
-          )}
+          ) : user ? (
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Reviews are available after your order is delivered.
+            </p>
+          ) : null}
         </div>
-        <ReviewForm
-          productId={product.id}
-          onSuccess={() => loadReviews(product.id)}
-        />
       </div>
     </div>
   );

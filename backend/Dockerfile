@@ -1,31 +1,26 @@
-FROM php:8.3-fpm
-
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libpq-dev \
-    zip \
-    unzip \
-    && docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-WORKDIR /var/www/html
-
+# ─── Development stage ───────────────────────────────────────────────────────
+FROM node:22-alpine AS development
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
 COPY . .
+EXPOSE 8081
+CMD ["npm", "run", "start:dev"]
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# ─── Build stage ─────────────────────────────────────────────────────────────
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
-USER www-data
-
-EXPOSE 9000
-
-CMD ["php-fpm"]
+# ─── Production stage ────────────────────────────────────────────────────────
+FROM node:22-alpine AS production
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+EXPOSE 8081
+CMD ["node", "dist/main"]

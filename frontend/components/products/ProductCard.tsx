@@ -1,98 +1,107 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingCart, Star } from 'lucide-react';
-import { Badge, Button } from '@/components/ui';
-import { useCart } from '@/context';
-import { useWishlistStore } from '@/lib/store';
-import { formatCurrency } from '@/lib/utils';
-import type { Product } from '@/types';
+import { Heart, Star, ShoppingCart, Download } from 'lucide-react';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { useCartStore } from '../../lib/store/cartStore';
+import { useCartActions } from '../../lib/hooks/useCartActions';
+import { useWishlistActions, useIsInWishlist } from '../../lib/hooks/useWishlistActions';
+import { formatPrice } from '../../lib/utils';
+import { toast } from 'sonner';
+import type { Product } from '../../types';
 
-interface ProductCardProps {
-  product: Product;
-}
+export function ProductCard({ product }: { product: Product }) {
+  const openCart = useCartStore((state) => state.openCart);
+  const { addToCart } = useCartActions();
+  const { toggleWishlist } = useWishlistActions();
+  const isWished = useIsInWishlist(product.id);
+  const primaryImage = product.media?.find((m) => m.isPrimary) || product.media?.[0];
+  const displayPrice = product.priceDisplay ?? product.priceKes;
+  const currency = product.currency ?? 'KES';
 
-export function ProductCard({ product }: ProductCardProps) {
-  const { addToCart } = useCart();
-  const { toggleItem, hasItem } = useWishlistStore();
-  const image = product.images?.find((i) => i.is_primary) ?? product.images?.[0];
-  const isWishlisted = hasItem(product.id);
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      await addToCart(product);
+      openCart();
+      toast.success(`${product.name} added to cart`);
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Could not add to cart');
+    }
+  };
+
+  const handleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    await toggleWishlist(product.id);
+  };
 
   return (
     <motion.div
       whileHover={{ y: -4 }}
-      className="group overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
     >
-      <Link href={`/products/${product.slug}`} className="relative block aspect-square overflow-hidden bg-border/30">
-        {image?.url ? (
-          <Image
-            src={image.url}
-            alt={image.alt ?? product.name}
-            fill
-            className="object-cover group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, 25vw"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-muted">
-            No image
-          </div>
-        )}
-        <div className="absolute left-2 top-2 flex flex-col gap-1">
-          {product.is_on_sale && <Badge variant="error">Sale</Badge>}
-          {product.is_new && <Badge variant="secondary">New</Badge>}
-        </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            toggleItem(product);
-          }}
-          className="absolute right-2 top-2 rounded-full bg-white/90 p-2 shadow-sm hover:bg-white"
-        >
-          <Heart
-            className={`h-4 w-4 ${isWishlisted ? 'fill-error text-error' : 'text-muted'}`}
-          />
-        </button>
-      </Link>
-
-      <div className="p-4">
-        <Link href={`/products/${product.slug}`}>
-          <h3 className="truncate font-medium hover:text-primary">{product.name}</h3>
-        </Link>
-
-        {product.average_rating !== undefined && product.average_rating > 0 && (
-          <div className="mt-1 flex items-center gap-1">
-            <Star className="h-3 w-3 fill-warning text-warning" />
-            <span className="text-xs text-muted">
-              {product.average_rating.toFixed(1)}
-              {product.review_count ? ` (${product.review_count})` : ''}
-            </span>
-          </div>
-        )}
-
-        <div className="mt-2 flex items-center justify-between">
-          <div>
-            <span className="text-lg font-bold text-primary">
-              {formatCurrency(product.price)}
-            </span>
-            {product.compare_at_price && product.compare_at_price > product.price && (
-              <span className="ml-2 text-sm text-muted line-through">
-                {formatCurrency(product.compare_at_price)}
-              </span>
+      <Link href={`/products/${product.slug}`}>
+        <div className="group bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] overflow-hidden hover:shadow-lg transition-shadow">
+          {/* Image */}
+          <div className="relative h-48 bg-[var(--color-background)]">
+            {primaryImage ? (
+              <Image src={primaryImage.url} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <ShoppingCart className="h-12 w-12 text-[var(--color-border)]" />
+              </div>
             )}
+            {/* Badges */}
+            <div className="absolute top-2 left-2 flex gap-1">
+              {product.isFeatured && <Badge variant="primary">Featured</Badge>}
+              {product.type === 'digital' && <Badge variant="secondary">Digital</Badge>}
+            </div>
+            {/* Wishlist button */}
+            <button
+              onClick={handleWishlist}
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-white/80 hover:bg-white transition-colors backdrop-blur-sm"
+            >
+              <Heart className={`h-4 w-4 ${isWished ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
+            </button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => addToCart(product)}
-            disabled={product.stock <= 0}
-          >
-            <ShoppingCart className="h-4 w-4" />
-          </Button>
+
+          {/* Content */}
+          <div className="p-4">
+            <h3 className="font-medium text-sm line-clamp-2 mb-1">{product.name}</h3>
+            {product.averageRating != null && (
+              <div className="flex items-center gap-1 mb-2">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {product.averageRating.toFixed(1)} ({product.reviewCount ?? 0})
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-[var(--color-primary)]">
+                {formatPrice(Number(displayPrice), currency)}
+              </span>
+              <Button
+                size="sm"
+                onClick={handleAddToCart}
+                disabled={product.stock === 0 && product.type === 'physical'}
+              >
+                {product.type === 'digital' ? (
+                  <><Download className="h-3 w-3" /> Buy</>
+                ) : product.stock === 0 ? (
+                  'Out of Stock'
+                ) : (
+                  <><ShoppingCart className="h-3 w-3" /> Add</>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+      </Link>
     </motion.div>
   );
 }
+
+export default ProductCard;

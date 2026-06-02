@@ -1,25 +1,18 @@
 import { create } from 'zustand';
 
-interface UiState {
-  mobileMenuOpen: boolean;
-  filterDrawerOpen: boolean;
+interface UiStore {
   currency: string;
-  setMobileMenuOpen: (open: boolean) => void;
-  toggleMobileMenu: () => void;
-  setFilterDrawerOpen: (open: boolean) => void;
-  toggleFilterDrawer: () => void;
+  isNavOpen: boolean;
   setCurrency: (currency: string) => void;
+  toggleNav: () => void;
+  closeNav: () => void;
 }
 
-export const useUiStore = create<UiState>((set) => ({
-  mobileMenuOpen: false,
-  filterDrawerOpen: false,
+export const useUiStore = create<UiStore>((set) => ({
   currency: 'KES',
+  isNavOpen: false,
 
-  setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
-  toggleMobileMenu: () => set((s) => ({ mobileMenuOpen: !s.mobileMenuOpen })),
-  setFilterDrawerOpen: (filterDrawerOpen) => set({ filterDrawerOpen }),
-  toggleFilterDrawer: () =>
-    set((s) => ({ filterDrawerOpen: !s.filterDrawerOpen })),
   setCurrency: (currency) => set({ currency }),
+  toggleNav: () => set((state) => ({ isNavOpen: !state.isNavOpen })),
+  closeNav: () => set({ isNavOpen: false }),
 }));

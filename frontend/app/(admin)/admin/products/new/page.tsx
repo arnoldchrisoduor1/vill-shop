@@ -1,45 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { productSchema, type ProductFormData } from '../../../../../validators/product';
+import { productsApi } from '../../../../../lib/api/products';
+import { categoriesApi } from '../../../../../lib/api/categories';
+import { Button } from '../../../../../components/ui/Button';
+import { Input } from '../../../../../components/ui/Input';
+import { Textarea } from '../../../../../components/ui/Textarea';
+import { Toggle } from '../../../../../components/ui/Toggle';
+import { Dropdown } from '../../../../../components/ui/Dropdown';
+import { ImageUploadPreview } from '../../../../../components/ui/ImageUploadPreview';
+import { useFeature } from '../../../../../context/FeatureContext';
 import { toast } from 'sonner';
-import { Button, Input, Textarea, Toggle, Card, CardContent } from '@/components/ui';
-import { createProduct } from '@/lib/api/products';
-import { productSchema, type ProductFormData } from '@/validators';
-import { PRODUCT_CATEGORIES } from '@/lib/constants';
-import { ApiFetchError } from '@/lib/api';
+import type { Category } from '../../../../../types';
 
 export default function NewProductPage() {
   const router = useRouter();
+  const digitalEnabled = useFeature('digital_products');
   const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [images, setImages] = useState<FileList | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<ProductFormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
-    defaultValues: {
-      is_featured: false,
-      is_active: true,
-      is_new: false,
-      is_on_sale: false,
-      category: 'other',
-    },
+    defaultValues: { type: 'physical', isActive: true, isFeatured: false, stock: 0 },
   });
+
+  useEffect(() => {
+    categoriesApi.getAll().then(setCategories).catch(() => {});
+  }, []);
 
   const onSubmit = async (data: ProductFormData) => {
     setIsLoading(true);
     try {
-      await createProduct(data);
-      toast.success('Product created');
+      const formData = new FormData();
+      const payload = {
+        ...data,
+        categoryId: data.categoryId || undefined,
+      };
+      Object.entries(payload).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) formData.append(key, String(val));
+      });
+      if (images) {
+        Array.from(images).forEach((file) => formData.append('images', file));
+      }
+      await productsApi.create(formData);
+      toast.success('Product created!');
       router.push('/admin/products');
-    } catch (err) {
-      toast.error(err instanceof ApiFetchError ? err.message : 'Failed to create product');
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to create product');
     } finally {
       setIsLoading(false);
     }
@@ -47,43 +59,40 @@ export default function NewProductPage() {
 
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-bold">New Product</h1>
-      <Card className="max-w-2xl">
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input label="Name" error={errors.name?.message} {...register('name')} />
-            <Textarea label="Description" error={errors.description?.message} {...register('description')} />
-            <Input label="Short Description" error={errors.short_description?.message} {...register('short_description')} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Price" type="number" step="0.01" error={errors.price?.message} {...register('price')} />
-              <Input label="Compare At Price" type="number" step="0.01" error={errors.compare_at_price?.message} {...register('compare_at_price')} />
-              <Input label="SKU" error={errors.sku?.message} {...register('sku')} />
-              <Input label="Stock" type="number" error={errors.stock?.message} {...register('stock')} />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Category</label>
-              <select
-                {...register('category')}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-              >
-                {PRODUCT_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-wrap gap-4">
-              <Toggle label="Active" checked={watch('is_active')} onChange={(v) => setValue('is_active', v)} />
-              <Toggle label="Featured" checked={watch('is_featured')} onChange={(v) => setValue('is_featured', v)} />
-              <Toggle label="New" checked={watch('is_new')} onChange={(v) => setValue('is_new', v)} />
-              <Toggle label="On Sale" checked={watch('is_on_sale')} onChange={(v) => setValue('is_on_sale', v)} />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" isLoading={isLoading}>Create Product</Button>
-              <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <h1 className="text-2xl font-bold mb-8">New Product</h1>
+      <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Product Name" {...register('name')} error={errors.name?.message} className="col-span-2" />
+          <Input label="SKU" {...register('sku')} error={errors.sku?.message} />
+          <Input label="Price (KES)" type="number" step="0.01" {...register('priceKes', { valueAsNumber: true })} error={errors.priceKes?.message} />
+          <Input label="Stock" type="number" {...register('stock', { valueAsNumber: true })} error={errors.stock?.message} />
+          <Dropdown
+            label="Type"
+            options={[
+              { value: 'physical', label: 'Physical' },
+              ...(digitalEnabled ? [{ value: 'digital', label: 'Digital' }] : []),
+            ]}
+            value={watch('type')}
+            onChange={(val) => setValue('type', val as 'physical' | 'digital')}
+          />
+        </div>
+        <Textarea label="Description" {...register('description')} error={errors.description?.message} rows={5} />
+        <Dropdown
+          label="Category"
+          options={[{ value: '', label: 'No Category' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+          value={watch('categoryId') || ''}
+          onChange={(val) => setValue('categoryId', val || undefined)}
+        />
+        <div className="flex gap-6">
+          <Toggle label="Active" checked={watch('isActive') ?? true} onChange={(v) => setValue('isActive', v)} />
+          <Toggle label="Featured" checked={watch('isFeatured') ?? false} onChange={(v) => setValue('isFeatured', v)} />
+        </div>
+        <ImageUploadPreview label="Product Images" files={images} onChange={setImages} />
+        <div className="flex gap-3">
+          <Button type="submit" isLoading={isLoading}>Create Product</Button>
+          <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+        </div>
+      </form>
     </div>
   );
 }

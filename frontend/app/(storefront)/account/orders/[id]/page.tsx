@@ -1,108 +1,117 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Download, Package } from 'lucide-react';
+import { ordersApi } from '../../../../../lib/api/orders';
+import { paymentsApi } from '../../../../../lib/api/payments';
+import { Button } from '../../../../../components/ui/Button';
+import { Skeleton } from '../../../../../components/ui/Skeleton';
+import { formatDate, formatPrice, getOrderStateColor } from '../../../../../lib/utils';
 import { toast } from 'sonner';
-import { Badge, Button, Card, CardContent } from '@/components/ui';
-import { downloadOrderItem, getOrder } from '@/lib/api/orders';
-import { formatCurrency } from '@/lib/utils';
-import type { Order } from '@/types';
+import { Download } from 'lucide-react';
+import type { Order } from '../../../../../types';
 
-export default function AccountOrderDetailPage() {
-  const params = useParams();
-  const orderNumber = params.id as string;
+export default function OrderDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
   const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPaying, setIsPaying] = useState(false);
 
   useEffect(() => {
-    getOrder(orderNumber)
+    if (!id) return;
+    setIsLoading(true);
+    ordersApi.getOrder(id)
       .then(setOrder)
-      .catch(() => {
-        toast.error('Failed to load order');
-        setOrder(null);
-      })
-      .finally(() => setLoading(false));
-  }, [orderNumber]);
+      .catch(() => toast.error('Order not found'))
+      .finally(() => setIsLoading(false));
+  }, [id]);
 
-  async function handleDownload(itemId: number) {
-    setDownloadingId(itemId);
+  const handleDownload = async (itemId: string) => {
     try {
-      const url = await downloadOrderItem(orderNumber, itemId);
+      const { url } = await ordersApi.getDownloadUrl(id!, itemId);
       window.open(url, '_blank');
-      toast.success('Download started');
     } catch {
-      toast.error('Download unavailable for this item');
-    } finally {
-      setDownloadingId(null);
+      toast.error('Failed to get download link');
     }
-  }
+  };
 
-  if (loading) {
-    return <p className="text-muted">Loading order...</p>;
-  }
+  const handlePayNow = async () => {
+    if (!order) return;
+    setIsPaying(true);
+    try {
+      const { redirectUrl } = await paymentsApi.initiate(order.id);
+      if (!redirectUrl) {
+        toast.error('Payment could not be started');
+        return;
+      }
+      window.location.href = redirectUrl;
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Payment failed');
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
-  if (!order) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Package className="mx-auto mb-4 h-12 w-12 text-muted" />
-          <h2 className="text-lg font-semibold">Order not found</h2>
-          <Link href="/account/orders" className="mt-4 inline-block text-primary hover:underline">
-            Back to orders
-          </Link>
-        </CardContent>
-      </Card>
-    );
-  }
+  const isUnpaid = order?.state === 'PENDING' || order?.state === 'AWAITING_PAYMENT';
+
+  if (isLoading) return <div className="space-y-4"><Skeleton variant="card" className="h-32" /></div>;
+  if (!order) return <p>Order not found.</p>;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <Link href="/account/orders" className="text-sm text-primary hover:underline">
-            ← Back to orders
-          </Link>
-          <h1 className="mt-2 font-mono text-2xl font-bold">{order.order_number}</h1>
-          <p className="text-sm text-muted">
-            Placed {new Date(order.created_at).toLocaleDateString('en-KE')}
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-lg font-semibold">{order.orderNumber}</h2>
+        <div className="flex items-center gap-3">
+          {isUnpaid && (
+            <Button onClick={handlePayNow} isLoading={isPaying}>
+              Complete Payment
+            </Button>
+          )}
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${getOrderStateColor(order.state)}`}>
+            {order.state}
+          </span>
         </div>
-        <Badge variant="primary">{order.status}</Badge>
       </div>
 
-      <Card>
-        <CardContent className="space-y-4">
+      <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-6">
+        <h3 className="font-medium mb-4">Order Items</h3>
+        <div className="space-y-3">
           {order.items.map((item) => (
-            <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4 last:border-0 last:pb-0">
+            <div key={item.id} className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-0">
               <div>
-                <p className="font-semibold">{item.product_name}</p>
-                <p className="text-sm text-muted">Qty: {item.quantity}</p>
+                <p className="font-medium">{item.productName}</p>
+                {item.variantName && <p className="text-sm text-[var(--color-text-muted)]">{item.variantName}</p>}
+                <p className="text-sm text-[var(--color-text-muted)]">Qty: {item.quantity}</p>
               </div>
-              <div className="flex items-center gap-4">
-                <p className="font-semibold">{formatCurrency(item.total_price ?? item.total ?? 0, order.currency)}</p>
-                {item.is_digital && order.status !== 'pending' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    isLoading={downloadingId === item.id}
-                    onClick={() => handleDownload(item.id)}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download
+              <div className="text-right">
+                <p className="font-medium">{formatPrice(Number(item.priceDisplay) * item.quantity, item.currency)}</p>
+                {item.digitalFileKey && (
+                  <Button size="sm" variant="outline" onClick={() => handleDownload(item.id)} className="mt-1">
+                    <Download className="h-3 w-3" /> Download
                   </Button>
                 )}
               </div>
             </div>
           ))}
-          <div className="flex justify-between border-t border-border pt-4 font-bold">
-            <span>Total</span>
-            <span className="text-primary">{formatCurrency(order.total, order.currency)}</span>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="mt-4 space-y-1 text-sm text-right">
+          <p>Subtotal: {formatPrice(Number(order.subtotal), order.currency)}</p>
+          {Number(order.taxAmount) > 0 && <p>Tax: {formatPrice(Number(order.taxAmount), order.currency)}</p>}
+          <p className="font-bold text-lg">Total: {formatPrice(Number(order.total), order.currency)}</p>
+        </div>
+      </div>
+
+      {order.shippingAddress && (
+        <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-6">
+          <h3 className="font-medium mb-2">Shipping Address</h3>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {Object.values(order.shippingAddress).filter(Boolean).join(', ')}
+          </p>
+        </div>
+      )}
+
+      <p className="text-sm text-[var(--color-text-muted)]">Placed on {formatDate(order.createdAt)}</p>
     </div>
   );
 }

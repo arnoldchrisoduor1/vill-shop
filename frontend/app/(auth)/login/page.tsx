@@ -1,100 +1,78 @@
 'use client';
 
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
-import { ShoppingBag } from 'lucide-react';
+import { loginSchema, type LoginFormData } from '../../../validators/auth';
+import { useAuth } from '../../../context/AuthContext';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
 import { toast } from 'sonner';
-import { Button, Input, Card, CardContent } from '@/components/ui';
-import { useAuth } from '@/context';
-import { loginSchema, type LoginFormData } from '@/validators';
-import { ApiFetchError } from '@/lib/api';
 
 function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/account';
   const [isLoading, setIsLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data);
-      const redirect = searchParams.get('redirect');
-      if (redirect) router.push(redirect);
-    } catch (err) {
-      const message =
-        err instanceof ApiFetchError ? err.message : 'Login failed. Please try again.';
-      toast.error(message);
+      await login(data.email, data.password);
+      router.push(redirect);
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Login failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mx-auto w-full max-w-md"
-    >
-      <div className="mb-8 text-center">
-        <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary">
-          <ShoppingBag className="h-7 w-7" />
-          Vill Shop
-        </Link>
-        <p className="mt-2 text-muted">Sign in to your account</p>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md"
+      >
+        <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-8 shadow-sm">
+          <div className="text-center mb-8">
+            <Link href="/" className="text-2xl font-bold text-[var(--color-primary)]">Vill Shop</Link>
+            <h1 className="text-xl font-semibold mt-4">Sign In</h1>
+            <p className="text-sm text-[var(--color-text-muted)] mt-1">Welcome back!</p>
+          </div>
 
-      <Card>
-        <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              error={errors.email?.message}
-              {...register('email')}
-            />
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              error={errors.password?.message}
-              {...register('password')}
-            />
-            <Button type="submit" className="w-full" isLoading={isLoading}>
-              Sign In
-            </Button>
+            <Input label="Email" type="email" placeholder="your@email.com" {...register('email')} error={errors.email?.message} />
+            <Input label="Password" type="password" placeholder="••••••••" {...register('password')} error={errors.password?.message} />
+            <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>Sign In</Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted">
+
+          <p className="text-center text-sm text-[var(--color-text-muted)] mt-6">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="font-medium text-primary hover:underline">
-              Create one
-            </Link>
+            <Link href="/register" className="text-[var(--color-primary)] font-medium hover:underline">Create one</Link>
           </p>
-        </CardContent>
-      </Card>
-    </motion.div>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <Suspense>
-        <LoginForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-[var(--color-text-muted)]">Loading...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

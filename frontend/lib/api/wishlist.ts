@@ -1,21 +1,35 @@
-import { apiFetch } from './apiFetch';
-import { normalizeProduct } from './normalize';
-import type { Product } from '@/types/product';
+import { apiGet, apiPost, apiDelete, apiFetch } from './apiFetch';
+import type { Product } from '../../types';
 
-interface WishlistItem {
-  id: number;
-  product: Record<string, unknown>;
+export interface Wishlist {
+  id: string;
+  products: Product[];
 }
 
-export async function getWishlist(): Promise<Product[]> {
-  const items = await apiFetch<WishlistItem[]>('/wishlist');
-  return items.map((item) => normalizeProduct(item.product));
-}
+export const wishlistApi = {
+  getWishlist: () => apiGet<Wishlist>('/api/v1/wishlist'),
+  addProduct: (productId: string) =>
+    apiPost<Wishlist>('/api/v1/wishlist/products', { productId }),
+  removeProduct: (productId: string) =>
+    apiDelete<Wishlist>(`/api/v1/wishlist/products/${productId}`),
+  syncWishlist: (productIds: string[]) =>
+    apiPost<Wishlist>('/api/v1/wishlist/sync', { productIds }),
+};
 
-export async function addToWishlist(productId: number): Promise<void> {
-  await apiFetch(`/wishlist/${productId}`, { method: 'POST' });
-}
+export const getWishlist = () =>
+  apiFetch<Product[]>('/api/v1/wishlist');
 
-export async function removeFromWishlist(productId: number): Promise<void> {
-  await apiFetch(`/wishlist/${productId}`, { method: 'DELETE' });
-}
+export const addToWishlist = (productId: string) =>
+  apiFetch<{ productId: string }>('/api/v1/wishlist', {
+    method: 'POST',
+    body: JSON.stringify({ productId }),
+  });
+
+export const removeFromWishlist = (productId: string) =>
+  apiFetch<null>(`/api/v1/wishlist/${productId}`, { method: 'DELETE' });
+
+export const syncWishlist = (productIds: string[]) =>
+  apiFetch<Product[]>('/api/v1/wishlist/sync', {
+    method: 'POST',
+    body: JSON.stringify({ productIds }),
+  });

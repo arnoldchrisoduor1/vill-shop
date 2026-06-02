@@ -1,74 +1,87 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
 
-export interface DropdownItem {
-  label: string;
+interface Option {
   value: string;
-  icon?: ReactNode;
-  onClick?: () => void;
+  label: string;
 }
 
-export interface DropdownProps {
-  trigger: ReactNode;
-  items: DropdownItem[];
-  align?: 'left' | 'right';
+interface DropdownProps {
+  options: Option[];
+  value?: string;
+  onChange: (value: string) => void;
+  label?: string;
+  placeholder?: string;
   className?: string;
 }
 
-export function Dropdown({ trigger, items, align = 'left', className }: DropdownProps) {
-  const [open, setOpen] = useState(false);
+export function Dropdown({ options, value, onChange, label, placeholder = 'Select...', className }: DropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  const selected = options.find((o) => o.value === value);
+
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
-    <div ref={ref} className={cn('relative inline-block', className)}>
-      <button type="button" onClick={() => setOpen(!open)} className="inline-flex items-center">
-        {trigger}
-        <ChevronDown
-          className={cn('ml-1 h-4 w-4 text-muted', open && 'rotate-180')}
-        />
+    <div ref={ref} className={cn('relative', className)}>
+      {label && (
+        <label className="block text-sm font-medium text-[var(--color-text)] mb-1">{label}</label>
+      )}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          'flex w-full items-center justify-between rounded-[var(--radius)] border border-[var(--color-border)]',
+          'bg-white px-3 py-2 text-sm',
+          'focus:outline-none focus:border-[var(--color-primary)]',
+        )}
+      >
+        <span className={cn(!selected && 'text-[var(--color-text-muted)]')}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown className={cn('h-4 w-4 text-[var(--color-text-muted)] transition-transform', isOpen && 'rotate-180')} />
       </button>
       <AnimatePresence>
-        {open && (
-          <motion.div
+        {isOpen && (
+          <motion.ul
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className={cn(
-              'absolute z-50 mt-2 min-w-[160px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg',
-              align === 'right' ? 'right-0' : 'left-0',
-            )}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 mt-1 w-full rounded-[var(--radius)] border border-[var(--color-border)] bg-white shadow-lg overflow-hidden"
           >
-            {items.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-foreground hover:bg-primary/5"
-                onClick={() => {
-                  item.onClick?.();
-                  setOpen(false);
-                }}
-              >
-                {item.icon}
-                {item.label}
-              </button>
+            {options.map((option) => (
+              <li key={option.value}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(option.value); setIsOpen(false); }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-background)] transition-colors',
+                    option.value === value && 'text-[var(--color-primary)] font-medium',
+                  )}
+                >
+                  {option.label}
+                </button>
+              </li>
             ))}
-          </motion.div>
+          </motion.ul>
         )}
       </AnimatePresence>
     </div>
   );
 }
+
+export default Dropdown;

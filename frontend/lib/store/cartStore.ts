@@ -1,98 +1,93 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { CartItem } from '@/types/cart';
-import type { Product } from '@/types/product';
+import type { CartItem, Product, ProductVariant } from '../../types';
 
-interface LocalCartItem {
-  id?: number;
-  product_id: number;
-  quantity: number;
-  product?: Product;
-}
-
-interface CartState {
-  items: LocalCartItem[];
+interface CartStore {
+  items: CartItem[];
   isOpen: boolean;
-  isLoading: boolean;
-  addItem: (product: Product, quantity?: number) => void;
-  removeItem: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
-  clearItems: () => void;
-  setItems: (items: CartItem[]) => void;
-  openDrawer: () => void;
-  closeDrawer: () => void;
-  toggleDrawer: () => void;
-  setLoading: (loading: boolean) => void;
+  setCart: (items: CartItem[]) => void;
+  addItem: (product: Product, quantity?: number, variant?: ProductVariant) => void;
+  removeItem: (itemId: string) => void;
+  updateQuantity: (itemId: string, quantity: number) => void;
+  clearCart: () => void;
+  openCart: () => void;
+  closeCart: () => void;
+  toggleCart: () => void;
+  getTotal: () => number;
+  total: () => number;
+  getItemCount: () => number;
   itemCount: () => number;
-  subtotal: () => number;
 }
 
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      items: [],
-      isOpen: false,
-      isLoading: false,
+export const useCartStore = create<CartStore>((set, get) => ({
+  items: [],
+  isOpen: false,
 
-      addItem: (product, quantity = 1) => {
-        set((state) => {
-          const existing = state.items.find((i) => i.product_id === product.id);
-          if (existing) {
-            return {
-              items: state.items.map((i) =>
-                i.product_id === product.id
-                  ? { ...i, quantity: i.quantity + quantity }
-                  : i,
-              ),
-            };
-          }
-          return {
-            items: [...state.items, { product_id: product.id, quantity, product }],
-          };
-        });
-      },
+  setCart: (items) => set({ items }),
 
-      removeItem: (productId) => {
-        set((state) => ({
-          items: state.items.filter((i) => i.product_id !== productId),
-        }));
-      },
-
-      updateQuantity: (productId, quantity) => {
-        if (quantity <= 0) {
-          get().removeItem(productId);
-          return;
-        }
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.product_id === productId ? { ...i, quantity } : i,
+  addItem: (product, quantity = 1, variant) => {
+    set((state) => {
+      const existing = state.items.find(
+        (item) =>
+          item.product.id === product.id &&
+          item.variant?.id === variant?.id,
+      );
+      if (existing) {
+        return {
+          items: state.items.map((item) =>
+            item === existing
+              ? { ...item, quantity: item.quantity + quantity }
+              : item,
           ),
-        }));
-      },
+        };
+      }
+      const newItem: CartItem = {
+        id: `temp-${Date.now()}`,
+        product,
+        variant,
+        quantity,
+      };
+      return { items: [...state.items, newItem] };
+    });
+  },
 
-      clearItems: () => set({ items: [] }),
-      setItems: (items) =>
-        set({
-          items: items.map((i) => ({
-            id: i.id,
-            product_id: i.product_id,
-            quantity: i.quantity,
-            product: i.product,
-          })),
-        }),
-      openDrawer: () => set({ isOpen: true }),
-      closeDrawer: () => set({ isOpen: false }),
-      toggleDrawer: () => set((state) => ({ isOpen: !state.isOpen })),
-      setLoading: (isLoading) => set({ isLoading }),
+  removeItem: (itemId) =>
+    set((state) => ({ items: state.items.filter((i) => i.id !== itemId) })),
 
-      itemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
+  updateQuantity: (itemId, quantity) =>
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === itemId ? { ...i, quantity } : i,
+      ),
+    })),
 
-      subtotal: () =>
-        get().items.reduce(
-          (sum, i) => sum + (i.product?.price ?? 0) * i.quantity,
-          0,
-        ),
-    }),
-    { name: 'vill-cart' },
-  ),
-);
+  clearCart: () => set({ items: [] }),
+  openCart: () => set({ isOpen: true }),
+  closeCart: () => set({ isOpen: false }),
+  toggleCart: () => set((state) => ({ isOpen: !state.isOpen })),
+
+  getTotal: () => {
+    const { items } = get();
+    return items.reduce((sum, item) => {
+      const price = item.variant?.priceKes ?? item.product.priceKes;
+      return sum + Number(price) * item.quantity;
+    }, 0);
+  },
+
+  total: () => {
+    const { items } = get();
+    return items.reduce((sum, item) => {
+      const price = item.variant?.priceKes ?? item.product.priceKes;
+      return sum + Number(price) * item.quantity;
+    }, 0);
+  },
+
+  getItemCount: () => {
+    const { items } = get();
+    return items.reduce((sum, item) => sum + item.quantity, 0);
+  },
+
+  itemCount: () => {
+    const { items } = get();
+    return items.reduce((sum, item) => sum + item.quantity, 0);
+  },
+}));

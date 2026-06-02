@@ -1,0 +1,23 @@
+<p style="margin:0 0 16px">Hi <strong>{{customerName}}</strong>,</p>
+<p style="margin:0 0 20px">Thank you for shopping with Vill Shop. Here is your receipt for order <strong>{{orderNumber}}</strong>.</p>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:20px">
+  <p style="margin:0 0 6px;font-size:13px;color:#64748b">Order date</p>
+  <p style="margin:0 0 14px;font-size:15px;color:#0f172a">{{orderDate}}</p>
+  <p style="margin:0 0 6px;font-size:13px;color:#64748b">Status</p>
+  <p style="margin:0"><span style="display:inline-block;background:#ecfdf5;color:#047857;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600">{{orderState}}</span></p>
+</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:20px">
+  <thead>
+    <tr style="background:#f8fafc">
+      <th align="left" style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;border-bottom:1px solid #e2e8f0">Product</th>
+      <th align="center" style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;border-bottom:1px solid #e2e8f0">Qty</th>
+      <th align="right" style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;border-bottom:1px solid #e2e8f0">Price</th>
+    </tr>
+  </thead>
+  <tbody>{{itemsRows}}</tbody>
+</table>
+<div style="text-align:right;margin-bottom:8px">
+  <p style="margin:0 0 6px;color:#64748b;font-size:14px">Subtotal: <strong style="color:#0f172a">{{subtotal}}</strong></p>
+  <p style="margin:0 0 6px;color:#64748b;font-size:14px">Tax: <strong style="color:#0f172a">{{tax}}</strong></p>
+  <p style="margin:0;font-size:18px;font-weight:700;color:#00b5b8">Total: {{total}}</p>
+</div>

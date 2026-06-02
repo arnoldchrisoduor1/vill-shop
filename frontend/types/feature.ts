@@ -1,9 +1,6 @@
 export interface FeatureFlag {
-  key: string;
   name: string;
+  isEnabled: boolean;
+  value?: Record<string, unknown>;
   description?: string;
-  enabled: boolean;
-  value?: string | number | boolean;
 }
-
-export type FeatureKey = 'tax' | 'reviews' | 'wishlist' | 'newsletter' | 'events';

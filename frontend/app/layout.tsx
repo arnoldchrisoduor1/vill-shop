@@ -1,37 +1,32 @@
 import type { Metadata } from 'next';
-import localFont from 'next/font/local';
-import { Providers } from '@/components/Providers';
+import { Toaster } from 'sonner';
+import { Providers } from '../components/Providers';
 import './globals.css';
-
-const geistSans = localFont({
-  src: './fonts/GeistVF.woff',
-  variable: '--font-geist-sans',
-  weight: '100 900',
-});
-
-const geistMono = localFont({
-  src: './fonts/GeistMonoVF.woff',
-  variable: '--font-geist-mono',
-  weight: '100 900',
-});
 
 export const metadata: Metadata = {
   title: {
-    default: 'Vill Shop — Premium E-Commerce',
+    default: 'Vill Shop',
     template: '%s | Vill Shop',
   },
-  description: 'Discover quality products with fast delivery and exceptional service.',
+  description: 'Quality physical and digital products at great prices',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} font-body antialiased`}>
-        <Providers>{children}</Providers>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
+        <Providers>
+          {children}
+          <Toaster position="top-right" richColors closeButton />
+        </Providers>
       </body>
     </html>
   );

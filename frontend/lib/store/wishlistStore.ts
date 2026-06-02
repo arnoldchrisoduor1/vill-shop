@@ -1,44 +1,39 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { Product } from '@/types/product';
 
-interface WishlistState {
-  items: Product[];
-  addItem: (product: Product) => void;
-  removeItem: (productId: number) => void;
-  toggleItem: (product: Product) => void;
-  hasItem: (productId: number) => boolean;
-  clear: () => void;
+interface WishlistStore {
+  productIds: string[];
+  setWishlist: (productIds: string[]) => void;
+  addProduct: (productId: string) => void;
+  removeProduct: (productId: string) => void;
+  toggle: (productId: string) => void;
+  isInWishlist: (productId: string) => boolean;
 }
 
-export const useWishlistStore = create<WishlistState>()(
-  persist(
-    (set, get) => ({
-      items: [],
+export const useWishlistStore = create<WishlistStore>((set, get) => ({
+  productIds: [],
 
-      addItem: (product) => {
-        if (!get().hasItem(product.id)) {
-          set((state) => ({ items: [...state.items, product] }));
-        }
-      },
+  setWishlist: (productIds) => set({ productIds }),
 
-      removeItem: (productId) => {
-        set((state) => ({
-          items: state.items.filter((p) => p.id !== productId),
-        }));
-      },
+  addProduct: (productId) =>
+    set((state) => ({
+      productIds: state.productIds.includes(productId)
+        ? state.productIds
+        : [...state.productIds, productId],
+    })),
 
-      toggleItem: (product) => {
-        if (get().hasItem(product.id)) {
-          get().removeItem(product.id);
-        } else {
-          get().addItem(product);
-        }
-      },
+  removeProduct: (productId) =>
+    set((state) => ({
+      productIds: state.productIds.filter((id) => id !== productId),
+    })),
 
-      hasItem: (productId) => get().items.some((p) => p.id === productId),
-      clear: () => set({ items: [] }),
-    }),
-    { name: 'vill-wishlist' },
-  ),
-);
+  toggle: (productId) => {
+    const { productIds } = get();
+    if (productIds.includes(productId)) {
+      set({ productIds: productIds.filter((id) => id !== productId) });
+    } else {
+      set({ productIds: [...productIds, productId] });
+    }
+  },
+
+  isInWishlist: (productId) => get().productIds.includes(productId),
+}));

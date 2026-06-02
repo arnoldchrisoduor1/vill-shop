@@ -1,127 +1,103 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  DollarSign,
-  ShoppingBag,
-  Users,
-  Package,
-  TrendingUp,
-  AlertTriangle,
-} from 'lucide-react';
-import { Card, CardContent, Skeleton } from '@/components/ui';
-import { getDashboardStats } from '@/lib/api/stats';
-import { formatCurrency } from '@/lib/utils';
-import type { DashboardStats } from '@/types';
-
-const statCards = [
-  { key: 'total_revenue', label: 'Total Revenue', icon: DollarSign, format: 'currency' },
-  { key: 'total_orders', label: 'Total Orders', icon: ShoppingBag, format: 'number' },
-  { key: 'total_customers', label: 'Customers', icon: Users, format: 'number' },
-  { key: 'total_products', label: 'Products', icon: Package, format: 'number' },
-] as const;
+import Link from 'next/link';
+import { statsApi } from '../../../../lib/api/stats';
+import { Skeleton } from '../../../../components/ui/Skeleton';
+import { Badge } from '../../../../components/ui/Badge';
+import { formatPrice, formatDate, getOrderStateColor } from '../../../../lib/utils';
+import { TrendingUp, AlertTriangle } from 'lucide-react';
+import type { AdminDashboard } from '../../../../types';
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<AdminDashboard | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getDashboardStats()
-      .then(setStats)
-      .catch(() => setStats(null))
-      .finally(() => setLoading(false));
+    statsApi.getAdminDashboard()
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  return (
-    <div>
-      <h1 className="mb-8 text-2xl font-bold">Dashboard</h1>
+  if (isLoading) return <div className="space-y-4">{[1,2,3].map(i => <Skeleton key={i} variant="card" />)}</div>;
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          const value = stats?.[card.key as keyof DashboardStats];
-          return (
-            <motion.div
-              key={card.key}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <Card>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted">{card.label}</p>
-                      {loading ? (
-                        <Skeleton height={28} width={100} className="mt-1" />
-                      ) : (
-                        <p className="mt-1 text-2xl font-bold">
-                          {card.format === 'currency'
-                            ? formatCurrency(Number(value) || 0)
-                            : Number(value)?.toLocaleString() ?? '—'}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <Icon className="h-6 w-6 text-primary" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
+  return (
+    <div className="space-y-8">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+
+      {/* Revenue cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { label: 'Today', value: data?.revenueToday ?? 0 },
+          { label: 'This Week', value: data?.revenueWeek ?? 0 },
+          { label: 'This Month', value: data?.revenueMonth ?? 0 },
+        ].map(({ label, value }) => (
+          <div key={label} className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-5 w-5 text-[var(--color-primary)]" />
+              <span className="text-sm font-medium text-[var(--color-text-muted)]">Revenue {label}</span>
+            </div>
+            <p className="text-2xl font-bold text-[var(--color-primary)]">{formatPrice(Number(value))}</p>
+          </div>
+        ))}
       </div>
 
-      {!loading && stats && (
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-secondary" />
-                <h2 className="font-semibold">Performance</h2>
-              </div>
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted">Revenue Change</span>
-                  <span className={stats.revenue_change >= 0 ? 'text-secondary' : 'text-error'}>
-                    {stats.revenue_change >= 0 ? '+' : ''}
-                    {stats.revenue_change.toFixed(1)}%
-                  </span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Orders */}
+        <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Recent Orders</h2>
+            <Link href="/admin/orders" className="text-sm text-[var(--color-primary)]">View all</Link>
+          </div>
+          <div className="space-y-3">
+            {(data?.recentOrders ?? []).map((order) => (
+              <div key={order.id} className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-0">
+                <div>
+                  <p className="text-sm font-medium">{order.orderNumber}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">{order.user?.name} · {formatDate(order.createdAt)}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Orders Change</span>
-                  <span className={stats.orders_change >= 0 ? 'text-secondary' : 'text-error'}>
-                    {stats.orders_change >= 0 ? '+' : ''}
-                    {stats.orders_change.toFixed(1)}%
+                <div className="text-right">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getOrderStateColor(order.state)}`}>
+                    {order.state}
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Customers Change</span>
-                  <span className={stats.customers_change >= 0 ? 'text-secondary' : 'text-error'}>
-                    {stats.customers_change >= 0 ? '+' : ''}
-                    {stats.customers_change.toFixed(1)}%
-                  </span>
+                  <p className="text-sm font-medium mt-0.5">{formatPrice(Number(order.total), order.currency)}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <h2 className="font-semibold">Inventory Alerts</h2>
-              </div>
-              <p className="mt-4 text-3xl font-bold text-warning">
-                {stats.low_stock_count}
-              </p>
-              <p className="text-sm text-muted">products with low stock</p>
-            </CardContent>
-          </Card>
+            ))}
+            {(data?.recentOrders ?? []).length === 0 && (
+              <p className="text-sm text-[var(--color-text-muted)]">No orders yet.</p>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Low Stock */}
+        <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              Low Stock Alerts
+            </h2>
+            <Link href="/admin/inventory" className="text-sm text-[var(--color-primary)]">Manage</Link>
+          </div>
+          <div className="space-y-3">
+            {(data?.lowStockProducts ?? []).map((product) => (
+              <div key={product.id} className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-0">
+                <div>
+                  <p className="text-sm font-medium">{product.name}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">SKU: {product.sku}</p>
+                </div>
+                <Badge variant={product.stock === 0 ? 'danger' : 'warning'}>
+                  {product.stock} left
+                </Badge>
+              </div>
+            ))}
+            {(data?.lowStockProducts ?? []).length === 0 && (
+              <p className="text-sm text-[var(--color-text-muted)]">No low stock products.</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,42 +1,51 @@
 'use client';
 
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { wishlistApi } from '../../../../lib/api/wishlist';
+import { useWishlistStore } from '../../../../lib/store/wishlistStore';
+import { ProductCard } from '../../../../components/products/ProductCard';
+import { Skeleton } from '../../../../components/ui/Skeleton';
 import { Heart } from 'lucide-react';
-import { ProductCard } from '@/components/products/ProductCard';
-import { Card, CardContent } from '@/components/ui';
-import { useWishlistStore } from '@/lib/store';
+import type { Product } from '../../../../types';
 
-export default function AccountWishlistPage() {
-  const items = useWishlistStore((s) => s.items);
+export default function WishlistPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { setWishlist } = useWishlistStore();
 
-  if (items.length === 0) {
+  useEffect(() => {
+    wishlistApi.getWishlist()
+      .then((wishlist) => {
+        setProducts(wishlist.products ?? []);
+        setWishlist(wishlist.products?.map((p: Product) => p.id) ?? []);
+      })
+      .catch(() => setProducts([]))
+      .finally(() => setIsLoading(false));
+  }, [setWishlist]);
+
+  if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Heart className="mx-auto mb-4 h-12 w-12 text-muted" />
-          <h2 className="text-lg font-semibold">Your wishlist is empty</h2>
-          <p className="mt-2 text-muted">Save products you love for later</p>
-          <Link href="/products" className="mt-4 inline-block text-primary hover:underline">
-            Browse Products
-          </Link>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {[1,2,3].map((i) => <Skeleton key={i} variant="card" />)}
+      </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((product, i) => (
-        <motion.div
-          key={product.id}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.05 }}
-        >
-          <ProductCard product={product} />
-        </motion.div>
-      ))}
+    <div>
+      <h2 className="text-lg font-semibold mb-6">My Wishlist</h2>
+      {products.length === 0 ? (
+        <div className="text-center py-12">
+          <Heart className="h-16 w-16 text-[var(--color-border)] mx-auto mb-4" />
+          <p className="text-[var(--color-text-muted)]">Your wishlist is empty.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

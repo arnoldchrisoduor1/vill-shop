@@ -1,97 +1,48 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
-import { Calendar, MapPin, Users } from 'lucide-react';
-import { Badge, Card } from '@/components/ui';
-import { getEvents } from '@/lib/api/events';
-import type { Event } from '@/types';
+import { eventsApi } from '../../../lib/api/events';
+import { formatDate } from '../../../lib/utils';
+import { Calendar, MapPin } from 'lucide-react';
+import type { Metadata } from 'next';
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-KE', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+export const metadata: Metadata = { title: 'Events' };
 
-export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getEvents()
-      .then(setEvents)
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
-  }, []);
+export default async function EventsPage() {
+  const events = await eventsApi.getAll().catch(() => []);
 
   return (
-    <div className="container-page py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Events</h1>
-        <p className="mt-1 text-muted">Discover upcoming community events</p>
-      </div>
-
-      {loading ? (
-        <p className="text-muted">Loading events...</p>
-      ) : events.length === 0 ? (
-        <p className="text-muted">No upcoming events at the moment.</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <h1 className="text-2xl font-bold mb-8">Upcoming Events</h1>
+      {events.length === 0 ? (
+        <p className="text-[var(--color-text-muted)] text-center py-12">No upcoming events.</p>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {events.map((event, i) => (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <Link href={`/events/${event.slug}`}>
-                <Card hover padding="none" className="overflow-hidden">
-                  <div className="relative h-48 bg-primary/10">
-                    {event.image_url ? (
-                      <Image
-                        src={event.image_url}
-                        alt={event.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Calendar className="h-12 w-12 text-primary" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {events.map((event) => (
+            <Link key={event.id} href={`/events/${event.slug}`}>
+              <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] overflow-hidden hover:shadow-md transition-shadow">
+                {event.coverImageUrl && (
+                  <div className="relative h-48">
+                    <Image src={event.coverImageUrl} alt={event.title} fill className="object-cover" />
+                  </div>
+                )}
+                <div className="p-5">
+                  <h2 className="font-semibold text-lg mb-2 line-clamp-2">{event.title}</h2>
+                  <p className="text-sm text-[var(--color-text-muted)] mb-3 line-clamp-2">{event.description}</p>
+                  <div className="space-y-1 text-sm text-[var(--color-text-muted)]">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {formatDate(event.startsAt)}
+                    </div>
+                    {event.location && (
+                      <div className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        {event.location}
                       </div>
                     )}
                   </div>
-                  <div className="p-4">
-                    <Badge variant="primary" className="mb-2">
-                      {event.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                    <h2 className="text-lg font-semibold">{event.title}</h2>
-                    <div className="mt-2 space-y-1 text-sm text-muted">
-                      <p className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(event.starts_at)}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        {event.location}
-                      </p>
-                      {event.max_attendees && (
-                        <p className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          {event.current_attendees ?? 0} / {event.max_attendees} attendees
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            </motion.div>
+                </div>
+              </div>
+            </Link>
           ))}
         </div>
       )}

@@ -6,44 +6,72 @@ Single-vendor ecommerce platform — physical + digital products, multi-currency
 
 | Layer | Tech |
 |---|---|
-| Backend | Laravel 11, PHP 8.3, JWT, Horizon |
-| Frontend | Next.js 14, TypeScript, Tailwind |
-| Database | PostgreSQL |
-| Cache/Queue | Redis |
+| Backend | NestJS 10, TypeScript strict, TypeORM |
+| Frontend | Next.js 14, TypeScript, Tailwind CSS |
+| Database | PostgreSQL 16 |
+| Cache/Queue | Redis 7 + BullMQ |
 | Storage | MinIO (local) / S3 (prod) |
-| Email | Resend + Mailpit (local) |
+| Email | Nodemailer + Mailpit (local) |
 | Payments | Pesapal |
+| E2E Testing | Playwright |
+| Unit Testing | Jest + Supertest |
 
 ## Quick Start (Docker)
 
 ```bash
 cp .env.example .env
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env.local
 
 docker compose up -d
-docker compose exec php-fpm composer install
-docker compose exec php-fpm php artisan key:generate
-docker compose exec php-fpm php artisan migrate --seed
+
+# Run DB migrations
+docker compose exec nest-api npm run migration:run
+
+# Seed the database (admin user, categories, feature flags)
+docker compose exec nest-api npm run seed
 ```
 
 - **Storefront:** http://localhost:3000
 - **API:** http://localhost:8081/api/v1
-- **Mailpit:** http://localhost:8026 (SMTP on host port 1026 if 1025 is taken)
+- **Mailpit:** http://localhost:8025
 - **MinIO Console:** http://localhost:9001
+- **Bull Board (queues):** http://localhost:8081/admin/queues
 
 ### Default Admin
 
 ```
 Email: admin@villshop.local
-Password: password (change in production)
+Password: password
 ```
+
+> Change this immediately in production.
 
 ## Project Structure
 
 ```
 vill-shop/
-├── backend/          Laravel 11 API
+├── backend/          NestJS 10 API
+│   └── src/
+│       ├── auth/
+│       ├── products/
+│       ├── cart/
+│       ├── orders/
+│       ├── payments/
+│       ├── users/
+│       ├── reviews/
+│       ├── wishlist/
+│       ├── events/
+│       ├── hero-slides/
+│       ├── feature-flags/
+│       ├── inventory/
+│       ├── newsletter/
+│       ├── stats/
+│       ├── reports/
+│       ├── mail/
+│       ├── storage/
+│       ├── jobs/
+│       ├── health/
+│       ├── common/
+│       └── database/
 ├── frontend/         Next.js 14 App Router
 ├── infrastructure/   AWS deployment configs
 ├── scripts/          Launch & smoke test scripts
@@ -53,28 +81,34 @@ vill-shop/
 ## Development
 
 ```bash
-# Backend tests
-cd backend && php artisan test
+# Run everything locally
+docker compose up -d
 
-# Frontend
+# Backend only (with hot reload)
+cd backend && npm run start:dev
+
+# Frontend only
 cd frontend && npm run dev
-cd frontend && npm run build
+
+# Backend tests
+cd backend && npm run test
+cd backend && npm run test:e2e
+
+# E2E tests (Playwright)
+cd frontend && npx playwright test
+cd frontend && npx playwright test --ui   # interactive mode
 ```
 
 ## Production Launch
 
 See [scripts/LAUNCH.md](scripts/LAUNCH.md) for the full go-live checklist.
 
-```bash
-./scripts/smoke-test.sh https://api.villshop.com
-./scripts/seed-production.sh
-```
-
 ## CI/CD
 
 GitHub Actions workflows in `.github/workflows/`:
-- `backend.yml` — Pint, Pest, ECR push, ECS deploy
+- `backend.yml` — Lint, Jest tests, ECR push, ECS deploy
 - `frontend.yml` — Lint, build, ECR push, ECS deploy
+- `e2e.yml` — Playwright tests on pull requests
 
 ## License
 

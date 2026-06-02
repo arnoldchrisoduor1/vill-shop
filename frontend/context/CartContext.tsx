@@ -1,113 +1,108 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-import { toast } from 'sonner';
-import * as cartApi from '@/lib/api/cart';
-import { useCartStore } from '@/lib/store/cartStore';
-import type { Product } from '@/types/product';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
+import { cartApi } from '../lib/api/cart';
+import { loadGuestCart } from '../lib/hooks/useCartActions';
+import { useCartStore } from '../lib/store/cartStore';
+import { useWishlistStore } from '../lib/store/wishlistStore';
+import { wishlistApi } from '../lib/api/wishlist';
+import { useAuth } from './AuthContext';
 
 interface CartContextValue {
-  isSyncing: boolean;
-  addToCart: (product: Product, quantity?: number) => Promise<void>;
-  updateQuantity: (productId: number, quantity: number) => Promise<void>;
-  removeFromCart: (productId: number) => Promise<void>;
-  syncCart: () => Promise<void>;
+  refetchCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const store = useCartStore();
-
-  const syncCart = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-      const cart = await cartApi.getCart();
-      store.setItems(cart.items);
-    } catch {
-      // Guest cart stays local
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [store]);
+function WishlistLoader() {
+  const { user } = useAuth();
 
   useEffect(() => {
-    syncCart();
-  }, [syncCart]);
+    if (!user?.id) {
+      useWishlistStore.getState().setWishlist([]);
+      return;
+    }
 
-  const addToCart = useCallback(
-    async (product: Product, quantity = 1) => {
-      store.addItem(product, quantity);
-      store.openDrawer();
+    let cancelled = false;
+
+    wishlistApi
+      .getWishlist()
+      .then((wishlist) => {
+        if (!cancelled) {
+          useWishlistStore
+            .getState()
+            .setWishlist(wishlist.products.map((p) => p.id));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) useWishlistStore.getState().setWishlist([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  return null;
+}
+
+function CartLoader() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) {
+      loadGuestCart();
+      return;
+    }
+
+    let cancelled = false;
+
+    cartApi
+      .getCart()
+      .then((cart) => {
+        if (!cancelled) useCartStore.getState().setCart(cart.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) useCartStore.getState().setCart([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  return null;
+}
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  const refetchCart = useMemo(
+    () => async () => {
+      if (!user?.id) return;
       try {
-        const cart = await cartApi.addToCart(product.id, quantity);
-        store.setItems(cart.items);
-        toast.success(`${product.name} added to cart`);
+        const cart = await cartApi.getCart();
+        useCartStore.getState().setCart(cart.items ?? []);
       } catch {
-        toast.success(`${product.name} added to cart`);
+        // Cart fetch failure is non-fatal
       }
     },
-    [store],
+    [user?.id],
   );
 
-  const updateQuantity = useCallback(
-    async (productId: number, quantity: number) => {
-      store.updateQuantity(productId, quantity);
-      const item = store.items.find((i) => i.product_id === productId);
-      if (!item?.id) return;
+  const contextValue = useMemo(() => ({ refetchCart }), [refetchCart]);
 
-      try {
-        const cart = await cartApi.updateCartItem(item.id, quantity);
-        store.setItems(cart.items);
-      } catch {
-        // Local update persists
-      }
-    },
-    [store],
+  return (
+    <CartContext.Provider value={contextValue}>
+      <CartLoader />
+      <WishlistLoader />
+      {children}
+    </CartContext.Provider>
   );
-
-  const removeFromCart = useCallback(
-    async (productId: number) => {
-      const item = store.items.find((i) => i.product_id === productId);
-      store.removeItem(productId);
-
-      if (!item?.id) {
-        toast.success('Item removed from cart');
-        return;
-      }
-
-      try {
-        const cart = await cartApi.removeCartItem(item.id);
-        store.setItems(cart.items);
-        toast.success('Item removed from cart');
-      } catch {
-        toast.success('Item removed from cart');
-      }
-    },
-    [store],
-  );
-
-  const value = useMemo(
-    () => ({ isSyncing, addToCart, updateQuantity, removeFromCart, syncCart }),
-    [isSyncing, addToCart, updateQuantity, removeFromCart, syncCart],
-  );
-
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error('useCart must be used within CartProvider');
-  }
-  return context;
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error('useCart must be used within CartProvider');
+  return ctx;
 }

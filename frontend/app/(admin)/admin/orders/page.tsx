@@ -1,100 +1,100 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ordersApi } from '../../../../lib/api/orders';
+import { Button } from '../../../../components/ui/Button';
+import { Dropdown } from '../../../../components/ui/Dropdown';
+import { Skeleton } from '../../../../components/ui/Skeleton';
+import { formatPrice, formatDate, getOrderStateColor } from '../../../../lib/utils';
+import { ORDER_STATES } from '../../../../lib/constants';
 import { toast } from 'sonner';
-import { Badge, Button, TableRowSkeleton } from '@/components/ui';
-import {
-  cancelOrder,
-  deliverOrder,
-  getAdminOrders,
-  refundOrder,
-  shipOrder,
-} from '@/lib/api/orders';
-import { formatCurrency } from '@/lib/utils';
-import type { Order } from '@/types';
+import type { Order } from '../../../../types';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stateFilter, setStateFilter] = useState('');
 
-  const load = () => {
-    getAdminOrders()
-      .then((r) => setOrders(r.data))
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
-  };
+  useEffect(() => {
+    ordersApi.adminGetOrders(1, stateFilter || undefined)
+      .then((data) => setOrders(data.items ?? []))
+      .catch(() => {
+        setOrders([]);
+        toast.error('Failed to load orders');
+      })
+      .finally(() => setIsLoading(false));
+  }, [stateFilter]);
 
-  useEffect(load, []);
-
-  const handleAction = async (id: number, action: 'ship' | 'deliver' | 'cancel' | 'refund') => {
+  const handleTransition = async (orderId: string, newState: string) => {
     try {
-      const handlers = {
-        ship: shipOrder,
-        deliver: deliverOrder,
-        cancel: cancelOrder,
-        refund: refundOrder,
-      };
-      await handlers[action](id);
-      toast.success(`Order ${action === 'ship' ? 'shipped' : action === 'deliver' ? 'delivered' : `${action}ed`}`);
-      load();
-    } catch {
-      toast.error(`Failed to ${action} order`);
+      const updated = await ordersApi.adminTransitionState(orderId, newState);
+      setOrders((prev) => prev.map((o) => o.id === orderId ? updated : o));
+      toast.success(`Order ${newState}`);
+    } catch (err: unknown) {
+      toast.error((err as Error).message);
     }
   };
 
+  const NEXT_STATES: Record<string, string[]> = {
+    PENDING: ['AWAITING_PAYMENT', 'CANCELLED'],
+    AWAITING_PAYMENT: ['PAID', 'CANCELLED'],
+    PAID: ['PROCESSING', 'REFUNDED'],
+    PROCESSING: ['SHIPPED'],
+    SHIPPED: ['DELIVERED'],
+  };
+
+  if (isLoading) return <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>;
+
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-bold">Orders</h1>
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Orders</h1>
+        <div className="w-48">
+          <Dropdown
+            options={[{ value: '', label: 'All States' }, ...ORDER_STATES.map((s) => ({ value: s, label: s }))]}
+            value={stateFilter}
+            onChange={setStateFilter}
+          />
+        </div>
+      </div>
+      <div className="bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] overflow-hidden">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-background">
-              <th className="px-4 py-3 text-left font-medium">Order #</th>
-              <th className="px-4 py-3 text-left font-medium">Customer</th>
-              <th className="px-4 py-3 text-left font-medium">Total</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Date</th>
-              <th className="px-4 py-3 text-right font-medium">Actions</th>
+          <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
+            <tr>
+              <th className="px-4 py-3 text-left">Order</th>
+              <th className="px-4 py-3 text-left">Customer</th>
+              <th className="px-4 py-3 text-left">Date</th>
+              <th className="px-4 py-3 text-left">Total</th>
+              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading
-              ? Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={6} />)
-              : orders.map((order) => (
-                  <tr key={order.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3 font-mono">{order.order_number}</td>
-                    <td className="px-4 py-3">{order.customer_email ?? order.shipping_address?.email}</td>
-                    <td className="px-4 py-3">{formatCurrency(order.total, order.currency)}</td>
-                    <td className="px-4 py-3"><Badge>{order.status}</Badge></td>
-                    <td className="px-4 py-3">{new Date(order.created_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        {order.status === 'processing' && (
-                          <Button size="sm" variant="outline" onClick={() => handleAction(order.id, 'ship')}>
-                            Ship
-                          </Button>
-                        )}
-                        {order.status === 'shipped' && (
-                          <Button size="sm" variant="outline" onClick={() => handleAction(order.id, 'deliver')}>
-                            Deliver
-                          </Button>
-                        )}
-                        {(order.status === 'pending' || order.status === 'processing') && (
-                          <Button size="sm" variant="outline" onClick={() => handleAction(order.id, 'cancel')}>
-                            Cancel
-                          </Button>
-                        )}
-                        {(order.status === 'delivered' || order.status === 'shipped') && (
-                          <Button size="sm" variant="outline" onClick={() => handleAction(order.id, 'refund')}>
-                            Refund
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+            {orders.map((order) => (
+              <tr key={order.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-background)]">
+                <td className="px-4 py-3 font-medium">{order.orderNumber}</td>
+                <td className="px-4 py-3 text-[var(--color-text-muted)]">{order.user?.name}</td>
+                <td className="px-4 py-3 text-[var(--color-text-muted)]">{formatDate(order.createdAt)}</td>
+                <td className="px-4 py-3 font-medium">{formatPrice(Number(order.total), order.currency)}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getOrderStateColor(order.state)}`}>
+                    {order.state}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-1">
+                    {(NEXT_STATES[order.state] ?? []).map((s) => (
+                      <Button key={s} size="sm" variant="outline" onClick={() => handleTransition(order.id, s)}>
+                        {s}
+                      </Button>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
+        {orders.length === 0 && <p className="text-center py-8 text-[var(--color-text-muted)]">No orders.</p>}
       </div>
     </div>
   );

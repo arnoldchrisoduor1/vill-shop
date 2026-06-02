@@ -2,137 +2,60 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   Package,
-  Calendar,
-  ShoppingBag,
+  ShoppingCart,
   Users,
-  Warehouse,
-  Flag,
-  BarChart3,
+  Calendar,
   Image,
-  LogOut,
-  Menu,
-  X,
-  ChevronLeft,
+  ToggleLeft,
+  BarChart3,
+  Archive,
+  FolderTree,
 } from 'lucide-react';
-import { useState } from 'react';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/context';
+import { cn } from '../../lib/utils';
 
-const adminLinks = [
+const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/events', label: 'Events', icon: Calendar },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingBag },
+  { href: '/admin/categories', label: 'Categories', icon: FolderTree },
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/inventory', label: 'Inventory', icon: Archive },
   { href: '/admin/customers', label: 'Customers', icon: Users },
-  { href: '/admin/inventory', label: 'Inventory', icon: Warehouse },
-  { href: '/admin/feature-flags', label: 'Feature Flags', icon: Flag },
+  { href: '/admin/events', label: 'Events', icon: Calendar },
+  { href: '/admin/landing/hero', label: 'Hero Slides', icon: Image },
+  { href: '/admin/feature-flags', label: 'Feature Flags', icon: ToggleLeft },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/admin/landing/hero', label: 'Hero Manager', icon: Image },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { logout, user } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const sidebar = (
-    <aside
-      className={cn(
-        'flex h-full flex-col border-r border-border bg-surface',
-        collapsed ? 'w-16' : 'w-64',
-      )}
-    >
-      <div className="flex h-16 items-center justify-between border-b border-border px-4">
-        {!collapsed && (
-          <Link href="/admin/dashboard" className="text-lg font-bold text-primary">
-            Vill Admin
-          </Link>
-        )}
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          className="hidden rounded-lg p-1 hover:bg-border/50 lg:block"
-        >
-          <ChevronLeft
-            className={cn('h-5 w-5 transition-transform', collapsed && 'rotate-180')}
-          />
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileOpen(false)}
-          className="rounded-lg p-1 hover:bg-border/50 lg:hidden"
-        >
-          <X className="h-5 w-5" />
-        </button>
+  return (
+    <aside className="w-64 min-h-screen bg-[var(--color-text)] text-white flex flex-col">
+      <div className="px-6 py-4 border-b border-white/10">
+        <Link href="/admin/dashboard" className="text-xl font-bold text-[var(--color-primary)]">
+          Vill Shop
+        </Link>
+        <p className="text-xs text-white/50 mt-1">Admin Panel</p>
       </div>
-
-      <nav className="flex-1 space-y-1 p-2">
-        {adminLinks.map((link) => {
-          const Icon = link.icon;
-          const isActive = pathname.startsWith(link.href);
-          return (
-            <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
-              <motion.div
-                whileHover={{ x: 2 }}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted hover:bg-border/50 hover:text-foreground',
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && link.label}
-              </motion.div>
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {navItems.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-[var(--radius)] text-sm font-medium transition-colors',
+              pathname.startsWith(href)
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'text-white/70 hover:text-white hover:bg-white/10',
+            )}>
+            <Icon className="h-4 w-4" />
+            {label}
+          </Link>
+        ))}
       </nav>
-
-      <div className="border-t border-border p-4">
-        {!collapsed && user && (
-          <p className="mb-2 truncate text-sm text-muted">{user.name}</p>
-        )}
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-error/10 hover:text-error"
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          {!collapsed && 'Logout'}
-        </button>
+      <div className="px-6 py-4 border-t border-white/10">
+        <Link href="/" className="text-xs text-white/50 hover:text-white transition-colors">← Back to Store</Link>
       </div>
     </aside>
-  );
-
-  return (
-    <>
-      <div className="fixed left-0 top-0 z-40 hidden h-screen lg:block">
-        {sidebar}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-4 z-30 rounded-lg border border-border bg-surface p-2 lg:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-foreground/40"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="absolute left-0 top-0 h-full w-64">{sidebar}</div>
-        </div>
-      )}
-    </>
   );
 }

@@ -1,25 +1,17 @@
 'use client';
 
-import { Toaster } from 'sonner';
-import { AuthProvider, CartProvider, FeatureProvider } from '@/context';
+import { AuthProvider } from '../context/AuthContext';
+import { CartProvider } from '../context/CartContext';
+import { FeatureProvider } from '../context/FeatureContext';
+import { MaintenanceGate } from './MaintenanceGate';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <FeatureProvider>
-        <CartProvider>
-          {children}
-          <Toaster
-            position="top-right"
-            richColors
-            closeButton
-            toastOptions={{
-              style: {
-                fontFamily: 'var(--font-body)',
-              },
-            }}
-          />
-        </CartProvider>
+        <MaintenanceGate>
+          <CartProvider>{children}</CartProvider>
+        </MaintenanceGate>
       </FeatureProvider>
     </AuthProvider>
   );

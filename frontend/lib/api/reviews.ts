@@ -1,21 +1,25 @@
-import { apiFetch } from './apiFetch';
-import type { Review } from '@/types/review';
-import type { ReviewFormData } from '@/validators';
+import { apiGet, apiPost, apiDelete, apiFetch } from './apiFetch';
+import type { Review } from '../../types';
+import type { PaginatedResponse } from '../../types/api';
 
-export async function getProductReviews(productId: number): Promise<Review[]> {
-  return apiFetch<Review[]>(`/products/${productId}/reviews`);
-}
+export const reviewsApi = {
+  getProductReviews: (productId: string, page = 1) =>
+    apiGet<PaginatedResponse<Review>>(`/api/v1/products/${productId}/reviews?page=${page}`),
+  canReview: (productId: string) =>
+    apiGet<{ canReview: boolean }>(`/api/v1/products/${productId}/reviews/can-review`),
+  createReview: (productId: string, data: FormData) =>
+    apiFetch<Review>(`/api/v1/products/${productId}/reviews`, {
+      method: 'POST',
+      body: data,
+    }),
+  adminDeleteReview: (id: string) => apiDelete<null>(`/api/v1/admin/reviews/${id}`),
+};
 
-export async function createReview(
-  productId: number,
-  data: ReviewFormData,
-): Promise<Review> {
-  return apiFetch<Review>(`/products/${productId}/reviews`, {
-    method: 'POST',
-    body: data,
-  });
-}
+export const getReviews = (productId: string, cursor?: string) => {
+  const qs = new URLSearchParams({ productId });
+  if (cursor) qs.set('cursor', cursor);
+  return apiFetch<PaginatedResponse<Review>>(`/api/v1/reviews?${qs.toString()}`);
+};
 
-export async function deleteReview(reviewId: number): Promise<void> {
-  return apiFetch<void>(`/reviews/${reviewId}`, { method: 'DELETE' });
-}
+export const createReview = (payload: { productId: string; rating: number; comment?: string }) =>
+  apiFetch<Review>('/api/v1/reviews', { method: 'POST', body: JSON.stringify(payload) });

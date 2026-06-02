@@ -1,18 +1,9 @@
-export type UserRole = 'customer' | 'admin' | 'super_admin';
-
 export interface User {
-  id: number;
-  name: string;
+  id: string;
   email: string;
-  role: UserRole;
+  name: string;
   phone?: string;
-  avatar_url?: string;
-  email_verified_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AuthResponse {
-  user: User;
-  token?: string;
+  role: 'customer' | 'admin';
+  isBanned: boolean;
+  createdAt: string;
 }

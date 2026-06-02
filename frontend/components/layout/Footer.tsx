@@ -1,78 +1,46 @@
 import Link from 'next/link';
-import { ShoppingBag, Mail, Phone, MapPin } from 'lucide-react';
-
-const footerLinks = {
-  shop: [
-    { href: '/products', label: 'All Products' },
-    { href: '/products?is_on_sale=true', label: 'Sale' },
-    { href: '/products?is_new=true', label: 'New Arrivals' },
-    { href: '/events', label: 'Events' },
-  ],
-  account: [
-    { href: '/account', label: 'My Account' },
-    { href: '/account/orders', label: 'Orders' },
-    { href: '/account/wishlist', label: 'Wishlist' },
-    { href: '/cart', label: 'Cart' },
-  ],
-  company: [
-    { href: '/about', label: 'About Us' },
-    { href: '/contact', label: 'Contact' },
-    { href: '/privacy', label: 'Privacy Policy' },
-    { href: '/terms', label: 'Terms of Service' },
-  ],
-};
+import { ExternalLink, Mail, Phone, Globe } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-surface">
-      <div className="container-page py-12">
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+    <footer className="bg-[var(--color-text)] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <Link href="/" className="inline-flex items-center gap-2 text-xl font-bold text-primary">
-              <ShoppingBag className="h-6 w-6" />
-              Vill Shop
-            </Link>
-            <p className="mt-3 text-sm text-muted">
-              Premium products delivered with care. Quality you can trust, service you deserve.
-            </p>
-            <div className="mt-4 space-y-2 text-sm text-muted">
-              <p className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-primary" />
-                hello@villshop.com
-              </p>
-              <p className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-primary" />
-                +254 700 000 000
-              </p>
-              <p className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                Nairobi, Kenya
-              </p>
+            <h3 className="text-lg font-bold text-[var(--color-primary)] mb-4">Vill Shop</h3>
+            <p className="text-sm text-gray-400">Quality physical and digital products delivered to your door.</p>
+            <div className="flex gap-4 mt-4">
+              <a href="#" aria-label="Facebook" className="text-gray-400 hover:text-[var(--color-primary)] transition-colors"><ExternalLink className="h-5 w-5" /></a>
+              <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-[var(--color-primary)] transition-colors"><Globe className="h-5 w-5" /></a>
+              <a href="mailto:support@villshop.com" aria-label="Email" className="text-gray-400 hover:text-[var(--color-primary)] transition-colors"><Mail className="h-5 w-5" /></a>
+              <a href="tel:+254700000000" aria-label="Phone" className="text-gray-400 hover:text-[var(--color-primary)] transition-colors"><Phone className="h-5 w-5" /></a>
             </div>
           </div>
-
-          {Object.entries(footerLinks).map(([title, links]) => (
-            <div key={title}>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">
-                {title}
-              </h3>
-              <ul className="space-y-2">
-                {links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-muted hover:text-primary"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div>
+            <h4 className="font-semibold mb-4">Shop</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="/products" className="hover:text-white transition-colors">All Products</Link></li>
+              <li><Link href="/products?type=digital" className="hover:text-white transition-colors">Digital Products</Link></li>
+              <li><Link href="/events" className="hover:text-white transition-colors">Events</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Account</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link href="/account" className="hover:text-white transition-colors">My Account</Link></li>
+              <li><Link href="/account/orders" className="hover:text-white transition-colors">My Orders</Link></li>
+              <li><Link href="/account/wishlist" className="hover:text-white transition-colors">Wishlist</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Support</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><a href="mailto:support@villshop.com" className="hover:text-white transition-colors">support@villshop.com</a></li>
+              <li><span>+254 700 000 000</span></li>
+            </ul>
+          </div>
         </div>
-
-        <div className="mt-10 border-t border-border pt-6 text-center text-sm text-muted">
+        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500">
           © {new Date().getFullYear()} Vill Shop. All rights reserved.
         </div>
       </div>

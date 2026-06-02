@@ -1,63 +1,102 @@
-import { apiFetch } from './apiFetch';
-import { mapProductFilters, normalizeProduct } from './normalize';
-import type { PaginatedResponse } from '@/types';
-import type { Product, ProductFilters } from '@/types/product';
-import type { ProductFormData } from '@/validators';
+import { apiGet, apiPatch, apiDelete, apiFetch } from './apiFetch';
+import type { Product, PaginatedResponse } from '../../types';
 
-function normalizePaginated(response: PaginatedResponse<Record<string, unknown>>): PaginatedResponse<Product> {
-  return {
-    ...response,
-    data: response.data.map((item) => normalizeProduct(item)),
-  };
+export interface ProductFilters {
+  q?: string;
+  category?: string;
+  tags?: string;
+  type?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+  inStock?: boolean;
+  featured?: boolean;
+  sort?: string;
+  currency?: string;
+  cursor?: string;
+  limit?: number;
 }
 
-export async function getProducts(
-  filters?: ProductFilters,
-): Promise<PaginatedResponse<Product>> {
-  const response = await apiFetch<PaginatedResponse<Record<string, unknown>>>('/products', {
-    params: mapProductFilters(filters),
+function buildQuery(filters: ProductFilters): string {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, val]) => {
+    if (val !== undefined && val !== null && val !== '') {
+      params.set(key, String(val));
+    }
   });
-  return normalizePaginated(response);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
 }
 
-export async function getProduct(slug: string): Promise<Product> {
-  const product = await apiFetch<Record<string, unknown>>(`/products/${slug}`);
-  return normalizeProduct(product);
-}
+export const productsApi = {
+  getAll: (filters: ProductFilters = {}) =>
+    apiGet<PaginatedResponse<Product>>(`/api/v1/products${buildQuery(filters)}`),
 
-export async function getFeaturedProducts(): Promise<Product[]> {
-  const response = await getProducts({ is_featured: true, per_page: 8 });
-  return response.data;
-}
+  adminGetAll: (filters: ProductFilters = {}) =>
+    apiGet<PaginatedResponse<Product>>(`/api/v1/products/admin/list${buildQuery(filters)}`),
 
-export async function createProduct(data: ProductFormData | FormData): Promise<Product> {
-  const product = await apiFetch<Record<string, unknown>>('/admin/products', {
-    method: 'POST',
-    body: data,
+  getById: (id: string) => apiGet<Product>(`/api/v1/products/manage/${id}`),
+
+  getBySlug: (slug: string, currency?: string) =>
+    apiGet<Product>(`/api/v1/products/${slug}${currency ? `?currency=${currency}` : ''}`),
+
+  create: (data: FormData) =>
+    apiFetch<Product>('/api/v1/products', { method: 'POST', body: data }),
+
+  update: (id: string, data: FormData | object) =>
+    apiFetch<Product>(`/api/v1/products/${id}`, {
+      method: 'PATCH',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
+
+  delete: (id: string) => apiDelete<null>(`/api/v1/products/${id}`),
+
+  toggleFeatured: (id: string) =>
+    apiPatch<Product>(`/api/v1/products/${id}/featured`),
+
+  toggleActive: (id: string) =>
+    apiPatch<Product>(`/api/v1/products/${id}/active`),
+};
+
+// Standalone function exports for compatibility
+export const getProducts = (filters: ProductFilters = {}) =>
+  apiFetch<PaginatedResponse<Product>>(`/api/v1/products${buildQuery(filters)}`);
+
+export const getProduct = (slug: string) =>
+  apiFetch<Product>(`/api/v1/products/${slug}`);
+
+export const getFeaturedProducts = () =>
+  apiFetch<PaginatedResponse<Product>>('/api/v1/products?isFeatured=true&limit=8');
+
+export const adminGetProducts = (filters: ProductFilters = {}) =>
+  apiFetch<PaginatedResponse<Product>>(`/api/v1/admin/products${buildQuery(filters)}`);
+
+export const adminGetProduct = (id: string) =>
+  apiFetch<Product>(`/api/v1/admin/products/${id}`);
+
+export const adminCreateProduct = (data: FormData) =>
+  apiFetch<Product>('/api/v1/admin/products', { method: 'POST', body: data });
+
+export const adminUpdateProduct = (id: string, data: FormData) =>
+  apiFetch<Product>(`/api/v1/admin/products/${id}`, { method: 'PATCH', body: data });
+
+export const adminDeleteProduct = (id: string) =>
+  apiFetch<null>(`/api/v1/admin/products/${id}`, { method: 'DELETE' });
+
+export const adminToggleFeatured = (id: string, isFeatured: boolean) =>
+  apiFetch<Product>(`/api/v1/admin/products/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isFeatured }),
   });
-  return normalizeProduct(product);
-}
 
-export async function updateProduct(
-  id: number,
-  data: ProductFormData | FormData,
-): Promise<Product> {
-  const product = await apiFetch<Record<string, unknown>>(`/admin/products/${id}`, {
-    method: 'PUT',
-    body: data,
+export const adminToggleActive = (id: string, isActive: boolean) =>
+  apiFetch<Product>(`/api/v1/admin/products/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
   });
-  return normalizeProduct(product);
-}
 
-export async function deleteProduct(id: number): Promise<void> {
-  return apiFetch<void>(`/admin/products/${id}`, { method: 'DELETE' });
-}
-
-export async function getAdminProducts(
-  filters?: ProductFilters,
-): Promise<PaginatedResponse<Product>> {
-  const response = await apiFetch<PaginatedResponse<Record<string, unknown>>>('/admin/products', {
-    params: mapProductFilters(filters),
+export const adminUpdateStock = (id: string, stock: number) =>
+  apiFetch<Product>(`/api/v1/admin/products/${id}/stock`, {
+    method: 'PATCH',
+    body: JSON.stringify({ stock }),
   });
-  return normalizePaginated(response);
-}
