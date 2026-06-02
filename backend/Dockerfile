@@ -22,5 +22,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+COPY docker-entrypoint.prod.sh ./docker-entrypoint.prod.sh
+RUN chmod +x docker-entrypoint.prod.sh
 EXPOSE 8081
-CMD ["node", "dist/main"]
+CMD ["./docker-entrypoint.prod.sh"]

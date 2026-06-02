@@ -2,8 +2,12 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as fs from 'fs';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+const envPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -12,6 +16,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || 'villshop',
   password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_DATABASE || 'villshop',
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   entities: [path.join(__dirname, 'entities/*.entity.{ts,js}')],
   migrations: [path.join(__dirname, 'migrations/*.{ts,js}')],
   synchronize: false,
