@@ -89,6 +89,7 @@ export class PaymentsController {
 
   // ----- Pesapal callback (browser redirect after the user pays) -----
   @Public()
+  @RawResponse()
   @Get('api/pesapal/callback')
   @Redirect()
   async pesapalCallback(@Query('OrderTrackingId') trackingId: string) {
@@ -116,6 +117,7 @@ export class PaymentsController {
 
   // ----- Simulated payment (local dev only, when PESAPAL_SIMULATE=true) -----
   @Public()
+  @RawResponse()
   @Get('api/v1/payments/simulate')
   @Redirect()
   async simulate(@Query('OrderTrackingId') trackingId: string) {
@@ -135,6 +137,7 @@ export class PaymentsController {
 
   // ----- Legacy callback / webhook aliases (kept for backwards compat) -----
   @Public()
+  @RawResponse()
   @Get('api/v1/payments/callback')
   @Redirect()
   async callback(@Query('OrderTrackingId') trackingId: string) {

@@ -93,3 +93,10 @@ ADMIN_NAME=Admin
 ```
 
 Set `EMAIL_DRY_RUN=false` when ready to send live emails.
+
+<!-- PESAPAL_CONSUMER_KEY=wG7aea/q2IELr0Kd4jwxg8U8sU3ArSKf
+PESAPAL_CONSUMER_SECRET=BvWlQnB4wurw6JPz79sTRpJz/MY=
+PUBLIC_URL=https://shop.villa-allegra.com
+PESAPAL_ENV=production
+PESAPAL_IPN_ID=from_step_3
+PESAPAL_CALLBACK_URL=https://shop.villa-allegra.com/api/pesapal/callback -->
