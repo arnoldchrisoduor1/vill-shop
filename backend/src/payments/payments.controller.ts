@@ -44,11 +44,12 @@ export class PaymentsController {
   }
 
   // ----- Pesapal IPN (server-to-server payment status change) -----
-  // Pesapal calls this URL (registered as GET) whenever a payment status
-  // changes. It MUST reply with the exact JSON shape below (raw, unwrapped).
+  // Nginx strips the /api/ prefix before the request reaches NestJS, so these
+  // routes are registered without the api/ segment even though the public URL
+  // Pesapal calls is https://domain.com/api/pesapal/ipn.
   @Public()
   @RawResponse()
-  @Get('api/pesapal/ipn')
+  @Get('pesapal/ipn')
   @HttpCode(HttpStatus.OK)
   async pesapalIpnGet(
     @Query('OrderTrackingId') orderTrackingId: string,
@@ -69,7 +70,7 @@ export class PaymentsController {
 
   @Public()
   @RawResponse()
-  @Post('api/pesapal/ipn')
+  @Post('pesapal/ipn')
   @HttpCode(HttpStatus.OK)
   async pesapalIpnPost(
     @Body() payload: Record<string, unknown>,
@@ -88,9 +89,11 @@ export class PaymentsController {
   }
 
   // ----- Pesapal callback (browser redirect after the user pays) -----
+  // Same nginx stripping applies — public URL is /api/pesapal/callback but
+  // NestJS receives /pesapal/callback.
   @Public()
   @RawResponse()
-  @Get('api/pesapal/callback')
+  @Get('pesapal/callback')
   @Redirect()
   async pesapalCallback(@Query('OrderTrackingId') trackingId: string) {
     const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
@@ -146,7 +149,7 @@ export class PaymentsController {
 
   @Public()
   @RawResponse()
-  @Post('api/webhooks/pesapal')
+  @Post('webhooks/pesapal')
   @HttpCode(HttpStatus.OK)
   async pesapalWebhook(
     @Body() payload: Record<string, unknown>,
