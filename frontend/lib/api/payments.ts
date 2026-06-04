@@ -19,9 +19,10 @@ export async function initiatePayment(payload: {
   );
 }
 
-export async function getPaymentStatus(reference: string) {
+export async function getPaymentStatus(orderTrackingId: string) {
   return apiFetch<{
-    status: string;
-    orderId: string;
-  }>(`/api/v1/payments/status/${reference}`);
+    orderId: string | null;
+    paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+    orderState: string | null;
+  }>(`/api/v1/payments/status/${orderTrackingId}`);
 }

@@ -21,11 +21,16 @@ interface PesapalToken {
   expiresAt: number;
 }
 
+// Pesapal access tokens are valid for a maximum of 5 minutes. Refresh a little
+// early so an in-flight request never uses an expired token.
+const TOKEN_TTL_MS = 4 * 60 * 1000;
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly pesapalBaseUrl: string;
   private cachedToken: PesapalToken | null = null;
+  private cachedIpnId: string | null = null;
 
   constructor(
     @InjectRepository(Payment)
@@ -64,6 +69,19 @@ export class PaymentsService {
     return process.env.BACKEND_URL ?? process.env.API_URL ?? 'http://localhost:8081';
   }
 
+  /**
+   * Public base URL Pesapal can reach for IPN + callback (no trailing slash).
+   * Behind nginx this is the public domain that proxies /api/ to the backend.
+   */
+  private getPublicUrl(): string {
+    const url =
+      process.env.PUBLIC_URL ??
+      process.env.BACKEND_URL ??
+      process.env.API_URL ??
+      'http://localhost:8081';
+    return url.replace(/\/+$/, '');
+  }
+
   async getPesapalToken(): Promise<string> {
     const now = Date.now();
     if (this.cachedToken && this.cachedToken.expiresAt > now) {
@@ -79,10 +97,52 @@ export class PaymentsService {
       { headers: { Accept: 'application/json', 'Content-Type': 'application/json' } },
     );
 
-    const token = response.data.token as string;
-    // Cache for 55 minutes
-    this.cachedToken = { token, expiresAt: now + 55 * 60 * 1000 };
+    const token = response.data?.token as string | undefined;
+    if (!token) {
+      const msg = response.data?.error?.message ?? response.data?.message ?? 'unknown error';
+      this.logger.error(`Pesapal auth failed: ${msg}`);
+      throw new BadRequestException('Could not authenticate with Pesapal');
+    }
+
+    this.cachedToken = { token, expiresAt: now + TOKEN_TTL_MS };
     return token;
+  }
+
+  /**
+   * Returns a usable Pesapal IPN id (notification_id). Uses PESAPAL_IPN_ID if
+   * provided, otherwise registers our public IPN endpoint with Pesapal once and
+   * caches the resulting id for the process lifetime.
+   */
+  async ensureIpnId(): Promise<string> {
+    const fromEnv = process.env.PESAPAL_IPN_ID?.trim();
+    if (fromEnv) return fromEnv;
+    if (this.cachedIpnId) return this.cachedIpnId;
+
+    const token = await this.getPesapalToken();
+    const ipnUrl = `${this.getPublicUrl()}/api/pesapal/ipn`;
+
+    const response = await axios.post(
+      `${this.pesapalBaseUrl}/api/URLSetup/RegisterIPN`,
+      { url: ipnUrl, ipn_notification_type: 'GET' },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const ipnId = response.data?.ipn_id as string | undefined;
+    if (!ipnId) {
+      const msg = response.data?.error?.message ?? response.data?.message ?? 'unknown error';
+      this.logger.error(`Pesapal IPN registration failed: ${msg}`);
+      throw new BadRequestException('Could not register Pesapal IPN URL');
+    }
+
+    this.cachedIpnId = ipnId;
+    this.logger.log(`Registered Pesapal IPN ${ipnUrl} -> ${ipnId}`);
+    return ipnId;
   }
 
   async initiatePesapal(orderId: string, userId: string): Promise<{ redirectUrl: string }> {
@@ -105,17 +165,16 @@ export class PaymentsService {
     if (!user) throw new NotFoundException('User not found');
 
     const token = await this.getPesapalToken();
-
-    // Register IPN URL first (simplified: assume already registered)
-    const ipnUrl = `${process.env.API_URL ?? 'http://localhost:3000'}/api/webhooks/pesapal`;
+    const notificationId = await this.ensureIpnId();
+    const publicUrl = this.getPublicUrl();
 
     const submitPayload = {
       id: order.id,
       currency: order.currency,
       amount: Number(order.total),
       description: `Vill Shop Order #${order.orderNumber}`,
-      callback_url: `${process.env.API_URL ?? 'http://localhost:3000'}/api/v1/payments/callback`,
-      notification_id: process.env.PESAPAL_IPN_ID ?? '',
+      callback_url: `${publicUrl}/api/pesapal/callback`,
+      notification_id: notificationId,
       billing_address: {
         email_address: user.email,
         phone_number: user.phone ?? '',
@@ -136,12 +195,17 @@ export class PaymentsService {
       },
     );
 
-    const { redirect_url, order_tracking_id } = submitResponse.data;
+    const { redirect_url, order_tracking_id, error } = submitResponse.data ?? {};
+    if (!redirect_url || !order_tracking_id) {
+      const msg = error?.message ?? submitResponse.data?.message ?? 'unknown error';
+      this.logger.error(`Pesapal SubmitOrderRequest failed for order ${orderId}: ${msg}`);
+      throw new BadRequestException('Could not start Pesapal payment');
+    }
 
-    // Update payment with provider ref
+    // Persist provider ref so IPN/status lookups can find this payment.
     await this.paymentRepo.update(
       { orderId },
-      { providerRef: order_tracking_id },
+      { provider: 'pesapal', providerRef: order_tracking_id },
     );
 
     // Transition order to awaiting payment
@@ -249,14 +313,20 @@ export class PaymentsService {
     return { received: true };
   }
 
-  async verifyAndUpdatePayment(orderTrackingId: string): Promise<void> {
-    if (orderTrackingId.startsWith('sim-')) {
-      await this.completeSimulatedPayment(orderTrackingId);
-      return;
-    }
-
+  /**
+   * Queries Pesapal for the live transaction status and returns the raw fields.
+   * status_code: 0 INVALID, 1 COMPLETED, 2 FAILED, 3 REVERSED.
+   */
+  private async fetchPesapalStatus(orderTrackingId: string): Promise<{
+    statusCode: number;
+    description: string;
+    merchantReference: string;
+    paymentMethod?: string;
+    confirmationCode?: string;
+    paymentAccount?: string;
+    raw: Record<string, unknown>;
+  }> {
     const token = await this.getPesapalToken();
-
     const response = await axios.get(
       `${this.pesapalBaseUrl}/api/Transactions/GetTransactionStatus?orderTrackingId=${orderTrackingId}`,
       {
@@ -267,33 +337,67 @@ export class PaymentsService {
       },
     );
 
-    const { payment_status_description, order_merchant_reference } = response.data;
+    const data = response.data ?? {};
+    return {
+      statusCode: Number(data.status_code ?? -1),
+      description: String(data.payment_status_description ?? '').toUpperCase(),
+      merchantReference: data.merchant_reference ?? data.order_merchant_reference,
+      paymentMethod: data.payment_method,
+      confirmationCode: data.confirmation_code,
+      paymentAccount: data.payment_account,
+      raw: data,
+    };
+  }
 
-    const payment = await this.paymentRepo.findOne({
+  /**
+   * Verifies a transaction with Pesapal and syncs the local payment + order
+   * state. Returns the resolved order id and payment status (used by the
+   * status-check endpoint and the IPN/callback flows).
+   */
+  async verifyAndUpdatePayment(
+    orderTrackingId: string,
+  ): Promise<{ orderId: string | null; status: PaymentStatus }> {
+    if (orderTrackingId.startsWith('sim-')) {
+      const { orderId } = await this.completeSimulatedPayment(orderTrackingId);
+      return { orderId, status: PaymentStatus.COMPLETED };
+    }
+
+    const status = await this.fetchPesapalStatus(orderTrackingId);
+
+    let payment = await this.paymentRepo.findOne({
       where: { providerRef: orderTrackingId },
     });
 
-    if (!payment) {
-      // Try by order id
-      const order = await this.orderRepo.findOne({
-        where: { id: order_merchant_reference },
-      });
-      if (!order) {
-        this.logger.warn(`No order found for tracking id: ${orderTrackingId}`);
-        return;
-      }
+    const orderId = payment?.orderId ?? status.merchantReference;
+    if (!orderId) {
+      this.logger.warn(`No order found for tracking id: ${orderTrackingId}`);
+      return { orderId: null, status: PaymentStatus.PENDING };
     }
 
-    const orderId = payment?.orderId ?? order_merchant_reference;
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) return;
+    if (!order) {
+      this.logger.warn(`No order ${orderId} for tracking id: ${orderTrackingId}`);
+      return { orderId: null, status: PaymentStatus.PENDING };
+    }
 
-    const paymentRecord = payment ?? await this.paymentRepo.findOne({ where: { orderId } });
-    if (!paymentRecord) return;
+    payment = payment ?? (await this.paymentRepo.findOne({ where: { orderId } }));
+    if (!payment) return { orderId, status: PaymentStatus.PENDING };
 
-    if (payment_status_description === 'Completed') {
-      paymentRecord.status = PaymentStatus.COMPLETED;
-      await this.paymentRepo.save(paymentRecord);
+    payment.providerRef = payment.providerRef ?? orderTrackingId;
+    payment.metadata = {
+      ...payment.metadata,
+      paymentMethod: status.paymentMethod,
+      confirmationCode: status.confirmationCode,
+      paymentAccount: status.paymentAccount,
+      statusDescription: status.description,
+      statusCode: status.statusCode,
+      checkedAt: new Date().toISOString(),
+    };
+
+    // COMPLETED
+    if (status.statusCode === 1 || status.description === 'COMPLETED') {
+      payment.status = PaymentStatus.COMPLETED;
+      await this.paymentRepo.save(payment);
 
       if (order.state !== OrderState.PAID) {
         try {
@@ -305,9 +409,13 @@ export class PaymentsService {
           this.logger.warn(`Could not transition order ${order.id} to PAID: ${msg}`);
         }
       }
-    } else if (['Failed', 'Invalid'].includes(payment_status_description)) {
-      paymentRecord.status = PaymentStatus.FAILED;
-      await this.paymentRepo.save(paymentRecord);
+      return { orderId, status: PaymentStatus.COMPLETED };
+    }
+
+    // FAILED / INVALID
+    if (status.statusCode === 2 || ['FAILED', 'INVALID'].includes(status.description)) {
+      payment.status = PaymentStatus.FAILED;
+      await this.paymentRepo.save(payment);
 
       if ([OrderState.PENDING, OrderState.AWAITING_PAYMENT].includes(order.state)) {
         try {
@@ -318,7 +426,37 @@ export class PaymentsService {
           this.logger.warn(`Could not cancel order ${order.id}: ${msg}`);
         }
       }
+      return { orderId, status: PaymentStatus.FAILED };
     }
+
+    // REVERSED
+    if (status.statusCode === 3 || status.description === 'REVERSED') {
+      payment.status = PaymentStatus.REFUNDED;
+      await this.paymentRepo.save(payment);
+      return { orderId, status: PaymentStatus.REFUNDED };
+    }
+
+    // Still pending / unknown
+    await this.paymentRepo.save(payment);
+    return { orderId, status: PaymentStatus.PENDING };
+  }
+
+  /**
+   * Public status check by Pesapal order tracking id. Verifies with Pesapal and
+   * returns the current payment + order state for the frontend.
+   */
+  async getTransactionStatus(orderTrackingId: string): Promise<{
+    orderId: string | null;
+    paymentStatus: PaymentStatus;
+    orderState: OrderState | null;
+  }> {
+    const { orderId, status } = await this.verifyAndUpdatePayment(orderTrackingId);
+    let orderState: OrderState | null = null;
+    if (orderId) {
+      const order = await this.orderRepo.findOne({ where: { id: orderId } });
+      orderState = order?.state ?? null;
+    }
+    return { orderId, paymentStatus: status, orderState };
   }
 
   async refund(orderId: string): Promise<Payment> {

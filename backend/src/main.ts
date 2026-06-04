@@ -29,7 +29,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(
     new ControllerLogInterceptor(),
-    new ResponseInterceptor(),
+    new ResponseInterceptor(reflector),
   );
 
   app.useGlobalPipes(

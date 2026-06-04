@@ -80,64 +80,64 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
   # ─── NestJS API ──────────────────────────────────────────────────────────────
-  nest-api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: development
-    restart: unless-stopped
-    environment:
-      NODE_ENV: development
-      PORT: 8081
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USERNAME: villshop
-      DB_PASSWORD: password
-      DB_DATABASE: villshop
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      JWT_SECRET: local-dev-secret-change-in-production-32chars
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_USER: ''
-      SMTP_PASS: ''
-      SMTP_FROM: 'Vill Shop <noreply@villshop.local>'
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin
-      S3_BUCKET: villshop
-      PESAPAL_ENV: sandbox
-      FRONTEND_URL: http://localhost:3000
-      ADMIN_EMAIL: arnoldchrisoduor@gmail.com
-      ADMIN_PASSWORD: change-me
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    ports:
-      - '8081:8081'
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: npm run start:dev
+  # nest-api:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #     target: development
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: development
+  #     PORT: 8081
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_USERNAME: villshop
+  #     DB_PASSWORD: password
+  #     DB_DATABASE: villshop
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     JWT_SECRET: local-dev-secret-change-in-production-32chars
+  #     SMTP_HOST: mailpit
+  #     SMTP_PORT: 1025
+  #     SMTP_USER: ''
+  #     SMTP_PASS: ''
+  #     SMTP_FROM: 'Vill Shop <noreply@villshop.local>'
+  #     S3_ENDPOINT: http://minio:9000
+  #     S3_REGION: us-east-1
+  #     S3_ACCESS_KEY: minioadmin
+  #     S3_SECRET_KEY: minioadmin
+  #     S3_BUCKET: villshop
+  #     PESAPAL_ENV: sandbox
+  #     FRONTEND_URL: http://localhost:3000
+  #     ADMIN_EMAIL: arnoldchrisoduor@gmail.com
+  #     ADMIN_PASSWORD: change-me
+  #   volumes:
+  #     - ./backend:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - '8081:8081'
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   command: npm run start:dev
 
   # ─── Next.js frontend (pre-built production image) ───────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:8081
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-    ports:
-      - '3000:3000'
-    depends_on:
-      - nest-api
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #     target: production
+  #     args:
+  #       NEXT_PUBLIC_API_URL: http://localhost:8081
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #   ports:
+  #     - '3000:3000'
+  #   depends_on:
+  #     - nest-api
 
 volumes:
   postgres_data:
