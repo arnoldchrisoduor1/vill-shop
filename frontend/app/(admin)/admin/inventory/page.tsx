@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { apiFetch } from '../../../../lib/api/apiFetch';
+import { productsApi } from '../../../../lib/api/products';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { Badge } from '../../../../components/ui/Badge';
@@ -14,6 +16,7 @@ export default function AdminInventoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [updates, setUpdates] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch<{ items: Product[] }>('/api/v1/admin/inventory')
@@ -21,6 +24,25 @@ export default function AdminInventoryPage() {
       .catch(() => setProducts([]))
       .finally(() => setIsLoading(false));
   }, []);
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Delete product "${product.name}"? This cannot be undone.`)) return;
+    setDeletingId(product.id);
+    try {
+      await productsApi.delete(product.id);
+      setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      setUpdates((prev) => {
+        const next = { ...prev };
+        delete next[product.id];
+        return next;
+      });
+      toast.success('Product deleted');
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to delete product');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleSave = async () => {
     if (Object.keys(updates).length === 0) return;
@@ -60,6 +82,7 @@ export default function AdminInventoryPage() {
               <th className="px-4 py-3 text-left">SKU</th>
               <th className="px-4 py-3 text-left">Current Stock</th>
               <th className="px-4 py-3 text-left">Update Stock</th>
+              <th className="px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -86,6 +109,17 @@ export default function AdminInventoryPage() {
                       }
                     }}
                   />
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    aria-label="Delete product"
+                    isLoading={deletingId === product.id}
+                    onClick={() => handleDelete(product)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </td>
               </tr>
             ))}

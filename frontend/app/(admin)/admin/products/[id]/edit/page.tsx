@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { productsApi } from '../../../../../../lib/api/products';
 import { Input } from '../../../../../../components/ui/Input';
 import { Textarea } from '../../../../../../components/ui/Textarea';
+import { Trash2 } from 'lucide-react';
 import { Button } from '../../../../../../components/ui/Button';
 import { ImageUploadPreview } from '../../../../../../components/ui/ImageUploadPreview';
 import { toast } from 'sonner';
@@ -15,12 +16,28 @@ export default function EditProductPage() {
   const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [images, setImages] = useState<FileList | null>(null);
 
   useEffect(() => {
     if (!id) return;
     productsApi.getById(id).then(setProduct).catch(() => toast.error('Product not found'));
   }, [id]);
+
+  const handleDelete = async () => {
+    if (!product || !id) return;
+    if (!confirm(`Delete product "${product.name}"? This cannot be undone.`)) return;
+    setIsDeleting(true);
+    try {
+      await productsApi.delete(id);
+      toast.success('Product deleted');
+      router.push('/admin/products');
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to delete product');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -63,9 +80,18 @@ export default function EditProductPage() {
           existingUrls={existingImages}
           onChange={setImages}
         />
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button type="submit" isLoading={isLoading}>Save Changes</Button>
           <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+          <Button
+            type="button"
+            variant="danger"
+            isLoading={isDeleting}
+            onClick={handleDelete}
+            className="ml-auto"
+          >
+            <Trash2 className="h-4 w-4" /> Delete Product
+          </Button>
         </div>
       </form>
     </div>

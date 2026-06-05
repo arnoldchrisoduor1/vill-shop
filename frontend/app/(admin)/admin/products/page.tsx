@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutGrid, List, Plus, Edit, Search } from 'lucide-react';
+import { LayoutGrid, List, Plus, Edit, Search, Trash2 } from 'lucide-react';
 import { productsApi } from '../../../../lib/api/products';
 import { categoriesApi } from '../../../../lib/api/categories';
 import { Toggle } from '../../../../components/ui/Toggle';
@@ -25,6 +25,7 @@ export default function AdminProductsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
   const [view, setView] = useState<ViewMode>('list');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
@@ -76,6 +77,20 @@ export default function AdminProductsPage() {
       toast.success('Updated');
     } catch {
       toast.error('Failed');
+    }
+  };
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Delete product "${product.name}"? This cannot be undone.`)) return;
+    setDeletingId(product.id);
+    try {
+      await productsApi.delete(product.id);
+      setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      toast.success('Product deleted');
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to delete product');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -132,9 +147,22 @@ export default function AdminProductsPage() {
                   <Toggle checked={product.isActive} onChange={() => handleToggleActive(product)} />
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <Link href={`/admin/products/${product.id}/edit`}>
-                    <Button size="sm" variant="outline"><Edit className="h-3 w-3" /></Button>
-                  </Link>
+                  <div className="flex items-center justify-center gap-2">
+                    <Link href={`/admin/products/${product.id}/edit`}>
+                      <Button size="sm" variant="outline" aria-label="Edit product">
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      aria-label="Delete product"
+                      isLoading={deletingId === product.id}
+                      onClick={() => handleDelete(product)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </td>
               </tr>
             );
@@ -182,9 +210,22 @@ export default function AdminProductsPage() {
                     Active <Toggle checked={product.isActive} onChange={() => handleToggleActive(product)} />
                   </label>
                 </div>
-                <Link href={`/admin/products/${product.id}/edit`}>
-                  <Button size="sm" variant="outline"><Edit className="h-3 w-3" /></Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href={`/admin/products/${product.id}/edit`}>
+                    <Button size="sm" variant="outline" aria-label="Edit product">
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  </Link>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    aria-label="Delete product"
+                    isLoading={deletingId === product.id}
+                    onClick={() => handleDelete(product)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
