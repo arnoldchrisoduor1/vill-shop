@@ -14,41 +14,52 @@ export class EventsService {
     private storageService: StorageService,
   ) {}
 
+  private mapEvent(event: ShopEvent): ShopEvent {
+    if (event.coverImageUrl) {
+      event.coverImageUrl =
+        this.storageService.resolvePublicUrl(event.coverImageUrl) ?? event.coverImageUrl;
+    }
+    return event;
+  }
+
   async findAll(onlyPublished = false): Promise<ShopEvent[]> {
     if (!onlyPublished) {
-      return this.eventRepo.find({ order: { startsAt: 'ASC' } });
+      const events = await this.eventRepo.find({ order: { startsAt: 'ASC' } });
+      return events.map((e) => this.mapEvent(e));
     }
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
 
-    return this.eventRepo.find({
+    const events = await this.eventRepo.find({
       where: {
         isPublished: true,
         startsAt: MoreThan(cutoff),
       },
       order: { startsAt: 'ASC' },
     });
+    return events.map((e) => this.mapEvent(e));
   }
 
   async findById(id: string): Promise<ShopEvent> {
     const event = await this.eventRepo.findOne({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
-    return event;
+    return this.mapEvent(event);
   }
 
   async findBySlug(slug: string): Promise<ShopEvent> {
     const event = await this.eventRepo.findOne({ where: { slug } });
     if (!event) throw new NotFoundException(`Event '${slug}' not found`);
-    return event;
+    return this.mapEvent(event);
   }
 
   async findFeatured(limit = 3): Promise<ShopEvent[]> {
-    return this.eventRepo.find({
+    const events = await this.eventRepo.find({
       where: { isPublished: true, isFeatured: true },
       order: { startsAt: 'ASC' },
       take: limit,
     });
+    return events.map((e) => this.mapEvent(e));
   }
 
   async create(dto: CreateEventDto, file?: Express.Multer.File): Promise<ShopEvent> {

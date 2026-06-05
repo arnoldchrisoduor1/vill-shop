@@ -56,9 +56,42 @@ export class StorageService {
   }
 
   getPublicUrl(key: string): string {
+    const publicBase = process.env.S3_PUBLIC_URL?.replace(/\/+$/, '');
+    if (publicBase) {
+      return `${publicBase}/${this.bucket}/${key}`;
+    }
     if (this.endpoint) {
       return `${this.endpoint}/${this.bucket}/${key}`;
     }
     return `https://${this.bucket}.s3.${process.env.S3_REGION || 'us-east-1'}.amazonaws.com/${key}`;
+  }
+
+  /**
+   * Rewrites stored media URLs that use the internal Docker endpoint (e.g.
+   * http://minio:9000) to the browser-reachable S3_PUBLIC_URL base.
+   */
+  resolvePublicUrl(url: string | null | undefined): string | null | undefined {
+    if (!url) return url;
+
+    const publicBase = process.env.S3_PUBLIC_URL?.replace(/\/+$/, '');
+    if (!publicBase) return url;
+
+    const internalPrefixes = [
+      this.endpoint,
+      process.env.S3_ENDPOINT,
+      'http://minio:9000',
+      'http://localhost:9000',
+      'http://127.0.0.1:19000',
+    ]
+      .filter((p): p is string => Boolean(p))
+      .map((p) => p.replace(/\/+$/, ''));
+
+    for (const prefix of internalPrefixes) {
+      if (url.startsWith(prefix)) {
+        return `${publicBase}${url.slice(prefix.length)}`;
+      }
+    }
+
+    return url;
   }
 }

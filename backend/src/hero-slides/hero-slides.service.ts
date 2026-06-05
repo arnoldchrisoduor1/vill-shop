@@ -14,9 +14,18 @@ export class HeroSlidesService {
     private storageService: StorageService,
   ) {}
 
+  private mapSlide(slide: HeroSlide): HeroSlide {
+    if (slide.imageUrl) {
+      slide.imageUrl =
+        this.storageService.resolvePublicUrl(slide.imageUrl) ?? slide.imageUrl;
+    }
+    return slide;
+  }
+
   async findAll(onlyActive = false): Promise<HeroSlide[]> {
     const where = onlyActive ? { isActive: true } : {};
-    return this.slideRepo.find({ where, order: { sortOrder: 'ASC' } });
+    const slides = await this.slideRepo.find({ where, order: { sortOrder: 'ASC' } });
+    return slides.map((s) => this.mapSlide(s));
   }
 
   async create(dto: CreateHeroSlideDto, file?: Express.Multer.File): Promise<HeroSlide> {

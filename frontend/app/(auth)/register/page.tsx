@@ -2,19 +2,18 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { registerSchema, type RegisterFormData } from '../../../validators/auth';
 import { useAuth } from '../../../context/AuthContext';
+import { getPostLoginRedirect } from '../../../lib/auth/redirect';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { toast } from 'sonner';
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterFormData>({
@@ -24,9 +23,9 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
-      await registerUser(data.name, data.email, data.password);
+      const loggedInUser = await registerUser(data.name, data.email, data.password);
       toast.success('Account created successfully!');
-      router.push('/account');
+      window.location.assign(getPostLoginRedirect(loggedInUser, '/account'));
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Registration failed');
     } finally {

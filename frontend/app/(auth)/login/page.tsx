@@ -1,39 +1,55 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { loginSchema, type LoginFormData } from '../../../validators/auth';
 import { useAuth } from '../../../context/AuthContext';
+import { getPostLoginRedirect } from '../../../lib/auth/redirect';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { toast } from 'sonner';
 
 function LoginForm() {
-  const { login } = useAuth();
-  const router = useRouter();
+  const { login, user, isLoading: authLoading } = useAuth();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/account';
+  const redirect = searchParams.get('redirect');
   const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
+  // Already signed in — send to the right home (admin vs customer).
+  useEffect(() => {
+    if (!authLoading && user) {
+      window.location.assign(getPostLoginRedirect(user, redirect));
+    }
+  }, [user, authLoading, redirect]);
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
-      router.push(redirect);
+      const loggedInUser = await login(data.email, data.password);
+      const destination = getPostLoginRedirect(loggedInUser, redirect);
+      // Full page navigation so middleware sees the auth cookie immediately.
+      window.location.assign(destination);
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Login failed');
-    } finally {
       setIsLoading(false);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-[var(--color-text-muted)]">Redirecting...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">

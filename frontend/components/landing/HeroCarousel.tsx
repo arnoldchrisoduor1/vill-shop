@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/Button';
 import type { HeroSlide } from '../../types';
+import { resolveMediaUrl } from '../../lib/media';
 
 export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0);
@@ -32,6 +33,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   }
 
   const slide = slides[current];
+  const slideImageUrl = resolveMediaUrl(slide.imageUrl);
 
   return (
     <div className="relative h-[500px] overflow-hidden">
@@ -44,8 +46,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           transition={{ duration: 0.5 }}
           className="absolute inset-0"
         >
-          {slide.imageUrl ? (
-            <Image src={slide.imageUrl} alt={slide.headline} fill className="object-cover" priority />
+          {slideImageUrl ? (
+            <Image src={slideImageUrl} alt={slide.headline} fill className="object-cover" priority />
           ) : (
             <div className="h-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]" />
           )}

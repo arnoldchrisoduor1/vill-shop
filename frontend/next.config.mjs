@@ -10,6 +10,16 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'shop.villa-allegra.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'shop.villa-allegra.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: '*.amazonaws.com',
         pathname: '/**',
       },

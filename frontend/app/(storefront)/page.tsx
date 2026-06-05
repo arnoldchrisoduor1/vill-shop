@@ -10,6 +10,7 @@ import { Newsletter } from '../../components/landing/Newsletter';
 import { SocialProof } from '../../components/landing/SocialProof';
 import { ProductCard } from '../../components/products/ProductCard';
 import { formatDate } from '../../lib/utils';
+import { resolveMediaUrl } from '../../lib/media';
 import { Calendar, MapPin, ArrowRight } from 'lucide-react';
 
 async function getData() {
@@ -71,9 +72,9 @@ export default async function HomePage() {
               {featuredEvents.slice(0, 3).map((event) => (
                 <Link key={event.id} href={`/events/${event.slug}`}>
                   <div className="bg-white rounded-[var(--radius)] border border-[var(--color-border)] overflow-hidden hover:shadow-md transition-shadow">
-                    {event.coverImageUrl && (
+                    {resolveMediaUrl(event.coverImageUrl) && (
                       <div className="relative h-48">
-                        <Image src={event.coverImageUrl} alt={event.title} fill className="object-cover" />
+                        <Image src={resolveMediaUrl(event.coverImageUrl)!} alt={event.title} fill className="object-cover" />
                       </div>
                     )}
                     <div className="p-4">

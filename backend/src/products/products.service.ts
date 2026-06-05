@@ -48,6 +48,17 @@ export class ProductsService {
     );
   }
 
+  private withPublicMediaUrls<T extends { media?: ProductMedia[] }>(product: T): T {
+    if (!product.media?.length) return product;
+    return {
+      ...product,
+      media: product.media.map((m) => ({
+        ...m,
+        url: this.storageService.resolvePublicUrl(m.url) ?? m.url,
+      })),
+    };
+  }
+
   async findAll(
     filters: FilterProductsDto,
     options?: { includeInactive?: boolean },
@@ -157,12 +168,17 @@ export class ProductsService {
     const hasMore = products.length > limit;
     const items = hasMore ? products.slice(0, limit) : products;
 
-    const mappedItems = items.map((p) => ({
-      ...p,
-      priceDisplay:
-        currency !== 'KES' ? convertPrice(Number(p.priceKes), currency, rates) : Number(p.priceKes),
-      currency,
-    }));
+    const mappedItems = items.map((p) => {
+      const withMedia = this.withPublicMediaUrls(p);
+      return {
+        ...withMedia,
+        priceDisplay:
+          currency !== 'KES'
+            ? convertPrice(Number(p.priceKes), currency, rates)
+            : Number(p.priceKes),
+        currency,
+      };
+    });
 
     const nextCursor =
       hasMore && items.length > 0
@@ -200,7 +216,7 @@ export class ProductsService {
     }
 
     return {
-      ...product,
+      ...this.withPublicMediaUrls(product),
       averageRating: Math.round(averageRating * 10) / 10,
       reviewCount: ratings.length,
       priceDisplay,
@@ -214,7 +230,7 @@ export class ProductsService {
       relations: { category: true, tags: true, media: true, variants: true },
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product;
+    return this.withPublicMediaUrls(product);
   }
 
   async create(dto: CreateProductDto, files: Express.Multer.File[] = []): Promise<Product> {

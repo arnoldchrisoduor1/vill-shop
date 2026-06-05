@@ -10,6 +10,7 @@ import { useCartStore } from '../../lib/store/cartStore';
 import { useCartActions } from '../../lib/hooks/useCartActions';
 import { useWishlistActions, useIsInWishlist } from '../../lib/hooks/useWishlistActions';
 import { formatPrice } from '../../lib/utils';
+import { resolveMediaUrl } from '../../lib/media';
 import { toast } from 'sonner';
 import type { Product } from '../../types';
 
@@ -19,6 +20,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { toggleWishlist } = useWishlistActions();
   const isWished = useIsInWishlist(product.id);
   const primaryImage = product.media?.find((m) => m.isPrimary) || product.media?.[0];
+  const imageUrl = primaryImage ? resolveMediaUrl(primaryImage.url) : undefined;
   const displayPrice = product.priceDisplay ?? product.priceKes;
   const currency = product.currency ?? 'KES';
 
@@ -47,8 +49,8 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="group bg-[var(--color-surface)] rounded-[var(--radius)] border border-[var(--color-border)] overflow-hidden hover:shadow-lg transition-shadow">
           {/* Image */}
           <div className="relative h-48 bg-[var(--color-background)]">
-            {primaryImage ? (
-              <Image src={primaryImage.url} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
+            {imageUrl ? (
+              <Image src={imageUrl} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-300" unoptimized={imageUrl.startsWith('http://')} />
             ) : (
               <div className="h-full flex items-center justify-center">
                 <ShoppingCart className="h-12 w-12 text-[var(--color-border)]" />
