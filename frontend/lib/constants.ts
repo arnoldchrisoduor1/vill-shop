@@ -35,6 +35,15 @@ export const DEFAULT_CURRENCY = 'KES';
 export const ITEMS_PER_PAGE = 12;
 export const DEBOUNCE_MS = 300;
 
+export const CONTACT = {
+  email: 'info@villa-allegra.com',
+  phones: ['+254 733 193 123', '+254 706 285 083'],
+  locations: [
+    { city: 'Nairobi', address: 'Parkview Heights, Mombasa Road, Nairobi' },
+    { city: 'Nakuru', address: 'P.O. Box 2339-20100, Nakuru' },
+  ],
+} as const;
+
 export const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest First' },
   { value: 'price_asc', label: 'Price: Low to High' },

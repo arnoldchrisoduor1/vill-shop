@@ -42,7 +42,7 @@ export function renderEmail(
     bodyContent,
     ctaSection,
     year: String(new Date().getFullYear()),
-    supportEmail: process.env.ADMIN_EMAIL ?? process.env.EMAIL_FROM_ADDRESS ?? 'support@villshop.com',
+    supportEmail: process.env.ADMIN_EMAIL ?? process.env.EMAIL_FROM_ADDRESS ?? 'info@villa-allegra.com',
   });
 }
 

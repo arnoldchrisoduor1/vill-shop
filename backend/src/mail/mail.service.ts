@@ -255,7 +255,7 @@ export class MailService {
   async sendAccountBanned(user: User): Promise<void> {
     const html = renderEmail('account-banned', {
       customerName: user.name,
-      supportEmail: process.env.ADMIN_EMAIL ?? process.env.EMAIL_FROM_ADDRESS ?? '',
+      supportEmail: process.env.ADMIN_EMAIL ?? process.env.EMAIL_FROM_ADDRESS ?? 'info@villa-allegra.com',
       title: 'Account suspended',
       preheader: 'Your Vill Shop account has been suspended',
       eyebrow: 'Account notice',
